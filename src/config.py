@@ -153,6 +153,7 @@ class Config:
     debug_flags: int = 0  # bitmask for fine-grained debug (e.g. ARP reply)
     debug: bool = False
     log_level: str = "warning"
+    service: bool = False  # long-lived daemon (--service); required unless --list-* / --test / --version
     list_db: bool = False
     list_pve_db: bool = False
     list_peers: bool = False

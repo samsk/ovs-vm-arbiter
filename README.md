@@ -10,9 +10,11 @@ It is **not** a full SDN product—more like **focused glue** for people who alr
 
 ## Quick start
 
+Daemon mode needs **`--service`** (systemd passes it for you). Otherwise you must use a **`--list-*`** action, **`--test`**, or **`--version`**—bare tuning flags alone exit with an error so you do not start the long-lived process by mistake.
+
 ```bash
-ovs-vm-arbiter.py --broadcast-iface dcnet --bridges vmbr0
-# list
+ovs-vm-arbiter.py --service --broadcast-iface dcnet --bridges vmbr0
+# one-shot / diagnostics (no --service)
 ovs-vm-arbiter.py --list-neigh              # neighbours and exit
 ovs-vm-arbiter.py --list-fdb                # ovs FDB and exit
 ovs-vm-arbiter.py --list-pve-db             # parsed PVE instances only
@@ -24,6 +26,8 @@ ovs-vm-arbiter.py --test                    # run tests and exit
 
 ## Daemon single instance
 
+**`--service`** selects long-lived daemon mode. Without it, the process only runs if you passed at least one **list** flag (`--list-db`, `--list-neigh`, …), **`--test`**, or **`--version`**; anything else (e.g. only `--bridges` / `--debug`) is rejected with a short usage error.
+
 In normal (non–list-mode) operation the process takes an exclusive lock on `<state-dir>/ovs-vm-arbiter.lock`. A second instance exits with an error if the lock is held.
 
 ## Key options
@@ -31,6 +35,7 @@ In normal (non–list-mode) operation the process takes an exclusive lock on `<s
 
 | Option                                     | Default                        | Meaning                                                                                                                                                                                             |
 | ------------------------------------------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--service`                                | off                            | Run as long-lived daemon; **required** for that mode unless using `--list-*` / `--test` / `--version`                                                                                                |
 | `--bridges`                                | vmbr0                          | OVS bridges to monitor                                                                                                                                                                              |
 | `--db-path`                                | /var/lib/pve-cluster/config.db | Proxmox config DB (read-only)                                                                                                                                                                       |
 | `--state-dir`                              | /var/lib/ovs-vm-arbiter        | State JSON dir                                                                                                                                                                                      |
@@ -72,7 +77,7 @@ In normal (non–list-mode) operation the process takes an exclusive lock on `<s
 - **Learns** IP→MAC per **(bridge, VLAN)** from **ARP/DHCP snooping** and read-only Proxmox `**config.db`** (VM/LXC placement).
 - **Replicates** ownership to peers over a **UDP mesh** (small JSON payloads).
 - **Handles ARP** via **mirrored packets** (userspace) and, optionally, **OpenFlow per-IP responder** flows in OVS so **who-has** does not flood the whole overlay when the design allows.
-- **Entry point:** `ovs-vm-arbiter.py` or `python -m src.main`. **All configuration is CLI flags**—no separate config file in the shipped layout.
+- **Entry point:** `ovs-vm-arbiter.py` or `python -m src.main`. **All configuration is CLI flags**—no separate config file in the shipped layout. **Daemon:** pass **`--service`** (see *Quick start* / *Daemon single instance*).
 
 ### Why this approach (vs “real” SDN)
 
@@ -491,7 +496,7 @@ High-cardinality warning: extra mapping metrics can create many time-series. Kee
 ## Development / tests
 
 - **Installed script:** Run `ovs-vm-arbiter.py --test` to execute the built-in test suite and exit.
-- **From source checkout (this role):** Change into the `files` directory and run `python3 -m src.main --test`. This avoids clashes with the standard-library `types` module when importing `src.types`.
+- **From source checkout (this role):** Change into the `files` directory and run `python3 -m src.main --test`. This avoids clashes with the standard-library `types` module when importing `src.types`. Use `python3 -m src.main --service …` for daemon experiments from a checkout.
 
 ## How this project was built
 

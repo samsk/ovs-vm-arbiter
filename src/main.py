@@ -10,9 +10,9 @@ Node ID = IP (auto) or hostname. Config source: pmxcfs DB only (no /etc/pve fall
 
 Usage (copy-paste)
 ------------------
-  # Daemon (default bridge vmbr0)
-  ovs-vm-arbiter.py
-  ovs-vm-arbiter.py --debug --bridges vmbr0 vmbr1
+  # Daemon (systemd uses --service)
+  ovs-vm-arbiter.py --service
+  ovs-vm-arbiter.py --service --debug --bridges vmbr0 vmbr1
 
   # List modes
   ovs-vm-arbiter.py --list-db              # instance cache + snoop state (MAC-keyed)
@@ -261,6 +261,8 @@ def build_parser() -> argparse.ArgumentParser:
     # Core settings
     p.add_argument("--bridges", nargs="+", default=d.bridges,
                    help=f"OVS bridges to monitor (default: {' '.join(d.bridges)})")
+    p.add_argument("--service", action="store_true",
+                   help="Run as long-lived daemon (required unless using --list-* / --test / --version)")
     p.add_argument("--db-path", default=d.db_path,
                    help=f"Proxmox config.db path (default: {d.db_path})")
     p.add_argument("--state-dir", default=d.state_dir,
@@ -488,6 +490,27 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _has_explicit_run_mode(args: argparse.Namespace) -> bool:
+    """True if CLI selects daemon (--service), a list dump, --test, or --version."""
+    if getattr(args, "version", False) or getattr(args, "test", False):
+        return True
+    if getattr(args, "service", False):
+        return True
+    if getattr(args, "list_db", False) or getattr(args, "list_pve_db", False):
+        return True
+    if getattr(args, "list_peers", False) or getattr(args, "list_neigh", False):
+        return True
+    if getattr(args, "list_remote_ips", False) or getattr(args, "list_local_ips", False):
+        return True
+    if getattr(args, "list_refreshers", False) or getattr(args, "list_responders", False):
+        return True
+    if getattr(args, "list_vlans", False):
+        return True
+    if getattr(args, "list_fdb", None) is not None:
+        return True
+    return False
+
+
 def _acquire_daemon_lock(state_dir: str) -> tuple[object, str | None]:
     """Take exclusive lock file for single daemon instance. Returns (fd, None) or (None, error_msg)."""
     os.makedirs(state_dir, mode=0o755, exist_ok=True)
@@ -523,6 +546,11 @@ def main() -> int:
     if getattr(args, "test", False):
         from src.tests import run_tests
         return run_tests()
+
+    if not _has_explicit_run_mode(args):
+        parser.error(
+            "specify --service for daemon mode, or a --list-* action, or --test / --version"
+        )
 
     # tunnel-vlan(s): merge into no_snoop_vlans; set arp_reply_remote_vlan if single vlan
     tunnel_raw = getattr(args, "tunnel_vlans", None) or getattr(args, "tunnel_vlan", None)

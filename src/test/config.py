@@ -28,12 +28,12 @@ def test_parse_vlan_list() -> None:
 def test_config() -> None:
     """Config: from_args, is_debug, get_sign_key."""
     parser = build_parser()
-    args = parser.parse_args(["--bridges", "vmbr0", "--state-dir", "/tmp/arbiter-test"])
+    args = parser.parse_args(["--service", "--bridges", "vmbr0", "--state-dir", "/tmp/arbiter-test"])
     config = Config.from_args(args)
     _test_assert(config.bridges == ["vmbr0"] and config.state_dir == "/tmp/arbiter-test", "from_args")
     _test_assert(config.is_debug() is False, "is_debug")
     _test_assert(config.get_sign_key() is None, "get_sign_key none")
-    args2 = parser.parse_args(["--mesh-sign-key", "secret"])
+    args2 = parser.parse_args(["--service", "--mesh-sign-key", "secret"])
     config2 = Config.from_args(args2)
     _test_assert(config2.get_sign_key() == b"secret", "get_sign_key")
 
@@ -41,7 +41,7 @@ def test_config() -> None:
 def test_config_broadcast_iface_default() -> None:
     """Config.from_args sets broadcast_iface from first bridge when not provided."""
     parser = build_parser()
-    args = parser.parse_args(["--bridges", "vmbr0", "vmbr1"])
+    args = parser.parse_args(["--service", "--bridges", "vmbr0", "vmbr1"])
     cfg = Config.from_args(args)
     _test_assert(cfg.broadcast_iface == "vmbr0", "broadcast_iface defaults to first bridge")
 
@@ -62,7 +62,7 @@ def test_config_get_sign_key_file() -> None:
         path = f.name
     try:
         parser = build_parser()
-        args = parser.parse_args(["--mesh-sign-key-file", path])
+        args = parser.parse_args(["--service", "--mesh-sign-key-file", path])
         cfg = Config.from_args(args)
         _test_assert(cfg.get_sign_key() == b"file-key", "get_sign_key from file")
     finally:
@@ -100,22 +100,24 @@ def test_config_arp_responder_reply_local_default() -> None:
     """arp_responder_reply_local defaults to arp_reply_local when not set."""
     parser = build_parser()
     # Not set: follows arp_reply_local (default True)
-    args = parser.parse_args(["--bridges", "vmbr0"])
+    args = parser.parse_args(["--service", "--bridges", "vmbr0"])
     cfg = Config.from_args(args)
     _test_assert(cfg.arp_reply_local is True, "arp_reply_local default True")
     _test_assert(cfg.arp_responder_reply_local is True, "arp_responder_reply_local follows")
 
-    args_yes = parser.parse_args(["--bridges", "vmbr0", "--arp-reply-local"])
+    args_yes = parser.parse_args(["--service", "--bridges", "vmbr0", "--arp-reply-local"])
     cfg_yes = Config.from_args(args_yes)
     _test_assert(cfg_yes.arp_reply_local is True, "arp_reply_local True")
     _test_assert(cfg_yes.arp_responder_reply_local is True, "arp_responder_reply_local follows True")
 
-    args_no = parser.parse_args(["--bridges", "vmbr0", "--no-arp-reply-local"])
+    args_no = parser.parse_args(["--service", "--bridges", "vmbr0", "--no-arp-reply-local"])
     cfg_no = Config.from_args(args_no)
     _test_assert(cfg_no.arp_responder_reply_local is False, "arp_responder_reply_local follows False")
 
     # Explicit override
-    args_override = parser.parse_args(["--bridges", "vmbr0", "--arp-reply-local", "--no-arp-responder-reply-local"])
+    args_override = parser.parse_args(
+        ["--service", "--bridges", "vmbr0", "--arp-reply-local", "--no-arp-responder-reply-local"]
+    )
     cfg_ov = Config.from_args(args_override)
     _test_assert(cfg_ov.arp_reply_local is True and cfg_ov.arp_responder_reply_local is False, "explicit no wins")
 
@@ -123,11 +125,11 @@ def test_config_arp_responder_reply_local_default() -> None:
 def test_config_snoop_vlans_from_args() -> None:
     """Config.from_args parses --snoop-vlans and --no-snoop-vlans into sets."""
     parser = build_parser()
-    args = parser.parse_args(["--bridges", "vmbr0", "--snoop-vlans", "20,30-32,99"])
+    args = parser.parse_args(["--service", "--bridges", "vmbr0", "--snoop-vlans", "20,30-32,99"])
     cfg = Config.from_args(args)
     _test_assert(cfg.snoop_vlan_set is not None, "snoop_vlan_set set")
     _test_assert(cfg.snoop_vlan_set == frozenset({20, 30, 31, 32, 99}), "snoop range parsed")
-    args2 = parser.parse_args(["--bridges", "vmbr0", "--no-snoop-vlans", "1,2"])
+    args2 = parser.parse_args(["--service", "--bridges", "vmbr0", "--no-snoop-vlans", "1,2"])
     cfg2 = Config.from_args(args2)
     _test_assert(cfg2.no_snoop_vlan_set == frozenset({1, 2}), "no_snoop_vlan_set")
 
@@ -135,10 +137,12 @@ def test_config_snoop_vlans_from_args() -> None:
 def test_config_snoop_takeover_sec_default_and_override() -> None:
     """snoop_takeover_sec defaults to mesh_ttl/10 and supports override."""
     parser = build_parser()
-    args = parser.parse_args(["--bridges", "vmbr0", "--mesh-ttl", "500"])
+    args = parser.parse_args(["--service", "--bridges", "vmbr0", "--mesh-ttl", "500"])
     cfg = Config.from_args(args)
     _test_assert(cfg.snoop_takeover_sec == 50.0, "default takeover mesh_ttl/10")
-    args2 = parser.parse_args(["--bridges", "vmbr0", "--mesh-ttl", "500", "--snoop-takeover-sec", "120"])
+    args2 = parser.parse_args(
+        ["--service", "--bridges", "vmbr0", "--mesh-ttl", "500", "--snoop-takeover-sec", "120"]
+    )
     cfg2 = Config.from_args(args2)
     _test_assert(cfg2.snoop_takeover_sec == 120.0, "override takeover sec")
 
@@ -148,7 +152,7 @@ def test_config_mesh_send_max_interval() -> None:
     parser = build_parser()
     cfg_new = Config.from_args(
         parser.parse_args(
-            ["--bridges", "vmbr0", "--mesh-send-max-interval", "12"]
+            ["--service", "--bridges", "vmbr0", "--mesh-send-max-interval", "12"]
         )
     )
     _test_assert(cfg_new.mesh_send_max_interval == 12.0, "new max interval arg")
@@ -157,7 +161,7 @@ def test_config_mesh_send_max_interval() -> None:
 def test_config_migration_and_db_flags_defaults() -> None:
     """Config.from_args sets defaults for migration and DB flags."""
     parser = build_parser()
-    cfg = Config.from_args(parser.parse_args(["--bridges", "vmbr0"]))
+    cfg = Config.from_args(parser.parse_args(["--service", "--bridges", "vmbr0"]))
     _test_assert(cfg.verify_local_migration is True, "verify_local_migration default true")
     _test_assert(cfg.verify_remote_migration is False, "verify_remote_migration default false")
     _test_assert(cfg.db_stat_optimization is False, "db_stat_optimization default false")
@@ -192,11 +196,11 @@ def test_config_migration_and_db_flags_override() -> None:
 def test_config_migration_invalidates_fdb_default_and_override() -> None:
     """migration_invalidates_fdb defaults on and can be disabled."""
     parser = build_parser()
-    cfg = Config.from_args(parser.parse_args(["--bridges", "vmbr0"]))
+    cfg = Config.from_args(parser.parse_args(["--service", "--bridges", "vmbr0"]))
     _test_assert(cfg.migration_invalidates_fdb is True, "default enabled")
     cfg2 = Config.from_args(
         parser.parse_args(
-            ["--bridges", "vmbr0", "--no-migration-invalidates-fdb"]
+            ["--service", "--bridges", "vmbr0", "--no-migration-invalidates-fdb"]
         )
     )
     _test_assert(cfg2.migration_invalidates_fdb is False, "override disabled")
@@ -238,7 +242,7 @@ def test_config_list_mode_mask() -> None:
 def test_config_prometheus_flags() -> None:
     """Prometheus flags parse to Config fields."""
     parser = build_parser()
-    cfg = Config.from_args(parser.parse_args(["--bridges", "vmbr0"]))
+    cfg = Config.from_args(parser.parse_args(["--service", "--bridges", "vmbr0"]))
     _test_assert(cfg.prometheus_metrics is False, "prometheus disabled by default")
     _test_assert(cfg.prometheus_metrics_extra is False, "prometheus extra disabled by default")
     _test_assert(cfg.prometheus_port == 9108, "prometheus port default")
@@ -246,6 +250,7 @@ def test_config_prometheus_flags() -> None:
     cfg2 = Config.from_args(
         parser.parse_args(
             [
+                "--service",
                 "--bridges",
                 "vmbr0",
                 "--prometheus-metrics",
