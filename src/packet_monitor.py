@@ -83,6 +83,7 @@ class PacketMonitor:
         self._arp_reply_skipped_count: int = 0
         self._arp_reinject_sent_count: int = 0
         self._arp_reinject_failed_count: int = 0
+        self._arp_mac_mismatch_count: int = 0
         self._migration_local_refused_count: int = 0
         self._migration_local_confirmed_count: int = 0
 
@@ -121,6 +122,7 @@ class PacketMonitor:
             "reply_skipped": self._arp_reply_skipped_count,
             "reinject_sent": self._arp_reinject_sent_count,
             "reinject_failed": self._arp_reinject_failed_count,
+            "mac_mismatch": self._arp_mac_mismatch_count,
         }
 
     def migration_counters(self) -> dict[str, int]:
@@ -414,6 +416,15 @@ class PacketMonitor:
             ptype = "arp"
             raw_mac = (pkt[Ether].src if Ether in pkt else arp.hwsrc) or ""
             mac = MACAddress(raw_mac) if raw_mac else None
+            # Ether.src must match ARP.hwsrc (proxy ARP / spoofing guard)
+            hwsrc = str(getattr(arp, "hwsrc", "") or "").strip().lower()
+            if mac and hwsrc and mac.lower() != hwsrc:
+                self._arp_mac_mismatch_count += 1
+                self.log.info(
+                    "arp mac mismatch bridge=%s ether=%s hwsrc=%s (skip)",
+                    bridge, mac, hwsrc,
+                )
+                return None
             psrc = str(getattr(arp, "psrc", None) or "").strip()
             # Skip ARP probes (psrc=0.0.0.0) and broadcast source
             if psrc and psrc not in ("0.0.0.0", "255.255.255.255"):
@@ -580,6 +591,34 @@ class PacketMonitor:
             return None
         return "bridge"
 
+    def _log_local_migration_denied(
+        self,
+        entry_type: EntryType,
+        ip: IPv4Address,
+        mac: MACAddress,
+        bridge: BridgeName,
+        vlan_id: Optional[int],
+        current_node: Optional[NodeID],
+        local_node: Optional[NodeID],
+    ) -> None:
+        """Log denied local migration with severity by entry type.
+
+        Args:
+            entry_type: Classified entry type ("bridge", "qemu", "lxc", etc.).
+            ip: Candidate IP for ownership takeover.
+            mac: Candidate MAC for ownership takeover.
+            bridge: Bridge name for the snooped packet.
+            vlan_id: VLAN id (None for untagged).
+            current_node: Current owner node id.
+            local_node: Local node id attempting claim.
+        """
+        msg = (
+            "ALERT migration denied ip=%s mac=%s bridge=%s vlan=%s "
+            "current_node=%s local_node=%s reason=local_confirm_failed"
+        )
+        log_fn = self.log.warning if entry_type == "bridge" else self.log.error
+        log_fn(msg, ip, mac, bridge, vlan_id, current_node, local_node)
+
     def _update_snoop_entry(
         self,
         mac: MACAddress,
@@ -631,15 +670,7 @@ class PacketMonitor:
                                 key_vlan,
                             )
                             continue
-                        self.log.error(
-                            "ALERT migration denied ip=%s mac=%s bridge=%s vlan=%s current_node=%s local_node=%s reason=local_confirm_failed",
-                            ip,
-                            mac,
-                            bridge,
-                            vlan_n,
-                            e.node,
-                            node,
-                        )
+                        self._log_local_migration_denied(entry_type, ip, mac, bridge, vlan_n, e.node, node)
                         self._migration_local_refused_count += 1
                         return
                     self.log.info(
@@ -708,19 +739,18 @@ class PacketMonitor:
             if cur.node is not None and cur.node != NodeID(self.node_id):
                 # Fresh remote owner can still be overridden by explicit migration confirmation.
                 if not takeover_allowed:
+                    # Bridge IPs never migrate; skip costly DB check
+                    if entry_type == "bridge":
+                        self.log.debug("recv ip=%s kept remote node=%s (bridge, no migration)", ip, cur.node)
+                        self._last_snoop_time = now
+                        return
                     if self.config.verify_local_migration and self._is_local_migration_confirmed is not None:
                         if self._is_local_migration_confirmed(mac):
                             self._migration_local_confirmed_count += 1
                             takeover_allowed = True
                         else:
-                            self.log.error(
-                                "ALERT migration denied ip=%s mac=%s bridge=%s vlan=%s current_node=%s local_node=%s reason=local_confirm_failed",
-                                ip,
-                                mac,
-                                bridge,
-                                vlan_n,
-                                cur.node,
-                                node,
+                            self._log_local_migration_denied(
+                                entry_type, ip, mac, bridge, vlan_n, cur.node, node
                             )
                             self._migration_local_refused_count += 1
                             self._last_snoop_time = now
