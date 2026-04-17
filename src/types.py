@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from typing import Literal, NewType
+from typing import Literal, NewType, Union
 
 # Network identifiers
 MACAddress = NewType("MACAddress", str)
@@ -12,7 +12,12 @@ InterfaceName = NewType("InterfaceName", str)
 NodeID = NewType("NodeID", str)
 VMID = NewType("VMID", str)
 
-EntryType = Literal["qemu", "lxc", "vm", "bridge"]
+InstanceEntryType = Literal["qemu", "lxc", "vm"]
+NonInstanceEntryType = Literal["bridge", "foreign"]
+EntryType = Union[InstanceEntryType, NonInstanceEntryType]
+UnmeshedEntryType = Literal["foreign"]
+InstanceType = Literal["qemu", "lxc"]
+
 SnoopOrigin = Literal["arp", "dhcp", "proxmox"]
 OFPort = NewType("OFPort", str)
 OVSCookie = NewType("OVSCookie", str)

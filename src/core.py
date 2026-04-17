@@ -176,15 +176,24 @@ class ArbiterCore:
         return store.get(mac) is not None
 
     def _is_remote_migration_confirmed(self, mac: MACAddress, sender: NodeID) -> bool:
-        """Confirm remote owner by forcing fresh cluster PVE DB read.
+        """Confirm sender is authorised to own this MAC.
+
+        Local authority runs always (cheap): a MAC on this node's instance store
+        cannot be owned by any remote. Cluster authority runs only when
+        verify_remote_migration is enabled: force-refresh cluster PVE DB and
+        compare the cluster-wide owner against sender.
 
         Args:
-            mac: Candidate migrated MAC.
-            sender: Claimed owner node id from mesh payload.
+            mac: Candidate MAC from mesh payload.
+            sender: Claimed owner node id.
 
         Returns:
-            True when cluster mapping shows MAC owned by sender.
+            True when the sender may own this MAC.
         """
+        if not self.config.verify_remote_migration:
+            return True
+        if self._monitor.instances.get(mac) is not None:
+            return False
         store = self._watcher.poll(force_refresh=True)
         owner = store.get_node_for_mac(mac)
         return owner == sender

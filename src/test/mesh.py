@@ -742,6 +742,77 @@ def test_mesh_recv_remote_migration_allowed_with_confirmation() -> None:
     _test_assert(e is not None and e.node == NodeID("10.0.0.2"), "owner changed")
 
 
+def test_mesh_recv_confirm_called_on_new_entry_for_local_mac() -> None:
+    """Confirm callback fires on new entries, so remote claims on unknown IP are still authorised."""
+    entries = IPEntryStore()
+    now = 1000.0
+    ip = IPv4Address("192.168.12.32")
+    br = BridgeName("vmbr0")
+    local_mac = MACAddress("bc:24:11:d7:ad:5a")
+    cfg = Config(bridges=["vmbr0"], mesh_ttl=300.0)
+    log = MagicMock(spec=logging.Logger)
+    confirm = MagicMock(return_value=False)
+    mesh = MeshBroadcaster(
+        entries,
+        log,
+        cfg,
+        node_id=NodeID("172.16.12.13"),
+        is_remote_migration_confirmed=confirm,
+    )
+    raw = {
+        "192.168.12.32|vmbr0|": {
+            "ipv4": "192.168.12.32",
+            "mac": str(local_mac),
+            "bridge": "vmbr0",
+            "last_seen": now,
+        }
+    }
+    merged = mesh._merge_payload_entries("172.16.12.10", raw, now)
+    _test_assert(merged == 0, "remote claim refused for unknown-but-local mac")
+    _test_assert(entries.get(ip, br, None) is None, "no entry created")
+    _test_assert(confirm.call_count == 1, "confirm called even with no existing entry")
+    _test_assert(log.error.call_count >= 1, "refusal logged as alert")
+
+
+def test_mesh_recv_confirm_skipped_on_same_owner_refresh() -> None:
+    """Confirm callback is not invoked when refresh keeps the same owner."""
+    entries = IPEntryStore()
+    now = 1000.0
+    ip = IPv4Address("192.168.12.40")
+    br = BridgeName("vmbr0")
+    mac = MACAddress("aa:bb:cc:dd:ee:40")
+    sender = NodeID("172.16.12.12")
+    entries.set(
+        IPEntry(
+            ipv4=ip,
+            mac=mac,
+            bridge=br,
+            node=sender,
+            last_seen=900.0,
+        )
+    )
+    cfg = Config(bridges=["vmbr0"], mesh_ttl=300.0)
+    confirm = MagicMock(return_value=True)
+    mesh = MeshBroadcaster(
+        entries,
+        logging.getLogger("test"),
+        cfg,
+        node_id=NodeID("172.16.12.13"),
+        is_remote_migration_confirmed=confirm,
+    )
+    raw = {
+        "192.168.12.40|vmbr0|": {
+            "ipv4": "192.168.12.40",
+            "mac": str(mac),
+            "bridge": "vmbr0",
+            "last_seen": 950.0,
+        }
+    }
+    merged = mesh._merge_payload_entries(str(sender), raw, now)
+    _test_assert(merged == 1, "same-owner refresh accepted")
+    _test_assert(confirm.call_count == 0, "confirm skipped when owner unchanged")
+
+
 def test_mesh_start_bind_failure_closes_socket_no_recv_thread() -> None:
     """Bind OSError clears socket and does not start recv thread."""
     entries = IPEntryStore()

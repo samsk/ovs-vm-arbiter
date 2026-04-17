@@ -389,33 +389,31 @@ class MeshBroadcaster:
             seen_keys.add(entry_key)
             if self._netlink and self._netlink.is_bridge_mac(received.mac):
                 continue
+            existing = self.entries.get(entry_key[0], entry_key[1], entry_key[2])
+            # Authorise sender for this MAC on create or owner change. Single
+            # confirmation point: the callback decides with local authority
+            # (cheap, always-on) and optionally cluster authority (when
+            # verify_remote_migration=True). Also runs for new entries so
+            # remote-owned entries for locally hosted MACs are refused too.
+            if self._is_remote_migration_confirmed is not None and (
+                existing is None or existing.node != sender
+            ):
+                self._migration_remote_confirmed_count += 1
+                if not self._is_remote_migration_confirmed(received.mac, sender):
+                    self._migration_remote_refused_count += 1
+                    self.log.error(
+                        "ALERT migration denied ip=%s mac=%s sender=%s reason=remote_confirm_failed",
+                        entry_key[0],
+                        received.mac,
+                        sender,
+                    )
+                    continue
             received.change_owner(sender)
             received.last_received = now
             received.bridge = entry_key[1] or received.bridge
             received.vlan = entry_key[2] if entry_key[2] is not None else received.vlan
-            existing = self.entries.get(entry_key[0], entry_key[1], entry_key[2])
             if existing:
                 owner_changed = existing.node != received.node
-                # Trust incoming remote owner change by default.
-                # Only verify_remote_migration can block it.
-                if (
-                    self.config.verify_remote_migration
-                    and existing.node is not None
-                    and received.node is not None
-                    and existing.node != received.node
-                    and self._is_remote_migration_confirmed is not None
-                ):
-                    self._migration_remote_confirmed_count += 1
-                    if not self._is_remote_migration_confirmed(received.mac, received.node):
-                        self._migration_remote_refused_count += 1
-                        self.log.error(
-                            "ALERT migration denied ip=%s mac=%s current_node=%s incoming_node=%s reason=remote_confirm_failed",
-                            entry_key[0],
-                            received.mac,
-                            existing.node,
-                            received.node,
-                        )
-                        continue
                 if existing.last_seen and (
                     not received.last_seen or existing.last_seen > received.last_seen
                 ):

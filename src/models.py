@@ -4,19 +4,50 @@ from __future__ import annotations
 import dataclasses
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Literal, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple, get_args
 
 from src.types import (
     BridgeName,
     EntryType,
+    InstanceEntryType,
+    InstanceType,
     IPv4Address,
     MACAddress,
     NodeID,
+    UnmeshedEntryType,
     VMID,
     RT_SCOPE_HOST,
 )
 
-InstanceType = Literal["qemu", "lxc"]
+
+def is_snoopable(entry_type: Optional[str]) -> bool:
+    """True for instance-backed types that the daemon actively snoops for.
+
+    Instance types (qemu, lxc, vm) are the primary target of ARP/DHCP snooping
+    and ownership arbitration. Non-instance types (bridge, foreign) are known
+    via netlink or observed passively. Derived from InstanceEntryType.
+
+    Args:
+        entry_type: EntryType value or None.
+
+    Returns:
+        True when entry_type is an instance-backed type.
+    """
+    return entry_type in get_args(InstanceEntryType)
+
+
+def is_unmeshed(entry_type: Optional[str]) -> bool:
+    """True for entry types that are tracked locally and never broadcast to mesh.
+
+    Stays in sync with UnmeshedEntryType via typing.get_args.
+
+    Args:
+        entry_type: EntryType value or None.
+
+    Returns:
+        True when entry_type must not be sent over the mesh.
+    """
+    return entry_type in get_args(UnmeshedEntryType)
 
 # Store key: same IP can exist on multiple (bridge, vlan)
 IPEntryKey = Tuple[IPv4Address, Optional[BridgeName], Optional[int]]
@@ -118,8 +149,10 @@ class IPEntry:
         self,
         is_host_local: Optional[Callable[[IPv4Address], bool]] = None,
     ) -> Optional[dict[str, Any]]:
-        """Dict for mesh broadcast; None if local (scope host or netlink host-local)."""
+        """Dict for mesh broadcast; None for host-local, scope=host, or foreign."""
         if self.is_local():
+            return None
+        if is_unmeshed(self.type):
             return None
         if is_host_local is not None and is_host_local(self.ipv4):
             return None

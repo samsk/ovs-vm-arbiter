@@ -171,7 +171,7 @@ State and mesh payload
 Types (NewType / Literal)
 -------------------------
   NewType: MACAddress, IPv4Address, BridgeName, InterfaceName, NodeID, VMID, OFPort, OVSCookie
-  Literal: EntryType = "qemu"|"lxc"|"vm"|"bridge"; InstanceType = "qemu"|"lxc"; SnoopOrigin = "arp"|"dhcp"|"proxmox"
+  Literal: EntryType = "qemu"|"lxc"|"vm"|"bridge"|"foreign"; InstanceType = "qemu"|"lxc"; SnoopOrigin = "arp"|"dhcp"|"proxmox"
 
 Dependencies
 -------------

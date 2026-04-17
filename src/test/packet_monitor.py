@@ -985,7 +985,7 @@ def test_snoop_new_entry_without_vlan() -> None:
     _test_assert(entry is not None, "new entry created")
     _test_assert(entry.mac == MACAddress("aa:bb:cc:dd:ee:01"), "mac from packet")
     _test_assert(entry.vlan is None, "no vlan")
-    _test_assert(entry.type == "bridge", "type bridge when no instance")
+    _test_assert(entry.type == "foreign", "type foreign when no local instance")
     _test_assert("arp" in (entry.snoop_origin or []), "origin arp")
 
 
@@ -1263,7 +1263,7 @@ def test_snoop_refresh_keeps_remote_node() -> None:
     )
     with patch("src.packet_monitor.time") as m_time:
         m_time.time.return_value = now
-        mon._update_snoop_entry(mac, ip, br, "bridge", "arp", 99, None)
+        mon._update_snoop_entry(mac, ip, br, "qemu", "arp", 99, None)
     entry = entries.get(ip, br, 99)
     _test_assert(entry is not None, "entry still present")
     _test_assert(entry.node == remote, "node unchanged (remote)")
@@ -1355,12 +1355,12 @@ def test_snoop_refresh_claims_stale_remote_owner() -> None:
     _test_assert(entry.expired is None, "expired cleared on takeover")
 
 
-def test_snoop_refresh_remote_logs_debug() -> None:
-    """When keeping remote node on refresh, debug log is emitted."""
+def test_snoop_bridge_always_reclaims_remote_owner() -> None:
+    """Bridge never migrates: snooping our OWN bridge MAC reclaims ownership and alerts."""
     entries = IPEntryStore()
-    mon = _make_snoop_monitor_with_node(entries, node_id="n1")
-    log = MagicMock(spec=logging.Logger)
-    mon.log = log
+    mon = _make_snoop_monitor_with_node(entries, node_id="n1", snoop_takeover_sec=300.0)
+    mon._netlink.is_bridge_mac.return_value = True
+    mon.log = MagicMock(spec=logging.Logger)
     br = BridgeName("vmbr0")
     ip = IPv4Address("192.168.13.177")
     mac = MACAddress("bc:24:11:90:b6:f3")
@@ -1373,14 +1373,17 @@ def test_snoop_refresh_remote_logs_debug() -> None:
             bridge=br,
             vlan=99,
             node=remote,
-            last_seen=now - 10,
+            last_seen=now - 1.0,
             snoop_origin=["arp"],
         )
     )
     with patch("src.packet_monitor.time") as m_time:
         m_time.time.return_value = now
         mon._update_snoop_entry(mac, ip, br, "bridge", "arp", 99, None)
-    log.debug.assert_any_call("recv ip=%s kept remote node=%s (bridge, no migration)", ip, remote)
+    entry = entries.get(ip, br, 99)
+    _test_assert(entry is not None and entry.node == NodeID("n1"), "bridge reclaimed regardless of takeover_sec")
+    alert_msgs = [c.args[0] for c in mon.log.warning.call_args_list if "ALERT bridge reclaim" in c.args[0]]
+    _test_assert(len(alert_msgs) == 1, "alert warning emitted on bridge reclaim")
 
 
 def test_snoop_new_entry_gets_self_node() -> None:
@@ -1588,7 +1591,7 @@ def test_snoop_refresh_remote_multiple_calls_still_remote() -> None:
         t = base + i * 10.0
         with patch("src.packet_monitor.time") as m_time:
             m_time.time.return_value = t
-            mon._update_snoop_entry(mac, ip, br, "bridge", "arp", 99, None)
+            mon._update_snoop_entry(mac, ip, br, "qemu", "arp", 99, None)
         entry = entries.get(ip, br, 99)
         _test_assert(entry is not None and entry.node == remote, f"after call {i+1} node still remote")
     _test_assert(entries.get(ip, br, 99).last_seen == base - 10, "last_seen unchanged for remote owner")
@@ -1616,13 +1619,13 @@ def test_snoop_refresh_flood_interval_skips_update() -> None:
     )
     with patch("src.packet_monitor.time") as m_time:
         m_time.time.return_value = now
-        mon._update_snoop_entry(mac, ip, br, "bridge", "arp", None, None)
+        mon._update_snoop_entry(mac, ip, br, "qemu", "arp", None, None)
     entry_after_first = entries.get(ip, br, None)
     _test_assert(entry_after_first is not None and entry_after_first.node == remote, "after first: node remote")
     last_seen_first = entry_after_first.last_seen
     with patch("src.packet_monitor.time") as m_time:
         m_time.time.return_value = now + 1.0
-        mon._update_snoop_entry(mac, ip, br, "bridge", "arp", None, None)
+        mon._update_snoop_entry(mac, ip, br, "qemu", "arp", None, None)
     entry_after_second = entries.get(ip, br, None)
     _test_assert(entry_after_second.last_seen == last_seen_first, "within flood interval: last_seen unchanged")
     _test_assert(entry_after_second.node == remote, "node still remote")
@@ -1656,9 +1659,14 @@ def test_snoop_takeover_default_ttl_div_10() -> None:
 
 
 def test_snoop_takeover_override_keeps_remote() -> None:
-    """Configured takeover window can keep remote owner."""
+    """Configured takeover window can keep remote owner for VM without local confirm."""
     entries = IPEntryStore()
-    mon = _make_snoop_monitor_with_node(entries, node_id="n1", snoop_takeover_sec=300.0)
+    mon = _make_snoop_monitor_with_node(
+        entries,
+        node_id="n1",
+        snoop_takeover_sec=300.0,
+        verify_local_migration=False,
+    )
     br = BridgeName("vmbr0")
     ip = IPv4Address("192.168.1.72")
     mac = MACAddress("aa:bb:cc:dd:ee:72")
@@ -1676,13 +1684,13 @@ def test_snoop_takeover_override_keeps_remote() -> None:
     )
     with patch("src.packet_monitor.time") as m_time:
         m_time.time.return_value = now
-        mon._update_snoop_entry(mac, ip, br, "bridge", "arp", None, None)
+        mon._update_snoop_entry(mac, ip, br, "qemu", "arp", None, None)
     entry = entries.get(ip, br, None)
     _test_assert(entry is not None and entry.node == NodeID("172.16.12.13"), "override keeps remote owner")
 
 
 def test_snoop_takeover_bridge_skips_db_confirm() -> None:
-    """Bridge entry_type skips DB migration confirm; keeps remote quietly."""
+    """Netlink-verified bridge MAC skips DB migration confirm and reclaims ownership."""
     entries = IPEntryStore()
     confirm = MagicMock(return_value=False)
     mon = _make_snoop_monitor_with_node(
@@ -1692,6 +1700,7 @@ def test_snoop_takeover_bridge_skips_db_confirm() -> None:
         verify_local_migration=True,
         is_local_migration_confirmed=confirm,
     )
+    mon._netlink.is_bridge_mac.return_value = True
     mon.log = MagicMock(spec=logging.Logger)
     br = BridgeName("vmbr0")
     ip = IPv4Address("192.168.1.73")
@@ -1712,10 +1721,9 @@ def test_snoop_takeover_bridge_skips_db_confirm() -> None:
         m_time.time.return_value = now
         mon._update_snoop_entry(mac, ip, br, "bridge", "arp", None, None)
     entry = entries.get(ip, br, None)
-    _test_assert(entry is not None and entry.node == NodeID("172.16.12.13"), "remote owner kept")
+    _test_assert(entry is not None and entry.node == NodeID("n1"), "bridge reclaims owner")
     _test_assert(confirm.call_count == 0, "DB confirm never called for bridge")
     _test_assert(mon.log.error.call_count == 0, "no error logged")
-    _test_assert(mon.log.warning.call_count == 0, "no warning logged")
 
 
 def test_snoop_takeover_denied_when_local_confirm_fails_qemu_logs_error() -> None:
@@ -1874,6 +1882,184 @@ def test_snoop_takeover_immediate_when_confirmed_even_if_fresh_remote() -> None:
     entry = entries.get(ip, br, None)
     _test_assert(confirm.call_count == 1, "confirm callback called for override")
     _test_assert(entry is not None and entry.node == NodeID("n1"), "confirmed migration overrides takeover window")
+
+
+def test_snoop_remote_bridge_ip_kept_without_alert() -> None:
+    """Remote bridge IP (e.g. another node's vmbr0) must be respected, no alert.
+
+    Reproduces pve-04 observing 192.168.12.2 ARP (pve-01's bridge IP). Locally
+    the MAC isn't our bridge MAC -> classifier returns "foreign", but the store
+    already has type="bridge" owned by the remote node (via mesh). Expected:
+    skip silently, no ALERT, no takeover attempt, no PVE DB lookup.
+    """
+    entries = IPEntryStore()
+    instances = InstanceStore()
+    mac = MACAddress("82:51:f3:21:c9:47")
+    confirm = MagicMock(return_value=False)
+    mon = _make_snoop_monitor_with_node(
+        entries,
+        node_id="172.16.12.13",
+        instances=instances,
+        snoop_takeover_sec=50.0,
+        verify_local_migration=True,
+        is_local_migration_confirmed=confirm,
+    )
+    mon.log = MagicMock(spec=logging.Logger)
+    br = BridgeName("vmbr0")
+    ip = IPv4Address("192.168.12.2")
+    remote = NodeID("172.16.12.10")
+    now = 1000.0
+    entries.set(
+        IPEntry(
+            ipv4=ip,
+            mac=mac,
+            bridge=br,
+            type="bridge",
+            node=remote,
+            last_seen=now - 1.0,
+            snoop_origin=["arp"],
+        )
+    )
+    with patch("src.packet_monitor.time") as m_time:
+        m_time.time.return_value = now
+        mon._update_snoop_entry(mac, ip, br, "foreign", "arp", None, None)
+    entry = entries.get(ip, br, None)
+    _test_assert(entry is not None and entry.node == remote, "remote bridge owner kept")
+    _test_assert(entry is not None and entry.type == "bridge", "remote bridge type preserved")
+    _test_assert(confirm.call_count == 0, "no PVE DB lookup for remote bridge")
+    _test_assert(mon.log.warning.call_count == 0, "no ALERT warning")
+    _test_assert(mon.log.error.call_count == 0, "no error logged")
+    counters = mon.migration_counters()
+    _test_assert(counters["local_refused"] == 0, "local_refused not incremented")
+
+
+def test_snoop_foreign_mac_with_remote_owner_refused_without_local_confirm() -> None:
+    """Reproduce pve-01 observing alien VM ARP while VM runs on pve-04.
+
+    Alien VM MAC is classified as "foreign" (not our bridge, not our instance);
+    snoop must refuse ownership takeover because the MAC is not local.
+    """
+    entries = IPEntryStore()
+    instances = InstanceStore()
+    mac = MACAddress("bc:24:11:d7:ad:5a")
+    confirm = MagicMock(return_value=False)
+    mon = _make_snoop_monitor_with_node(
+        entries,
+        node_id="172.16.12.10",
+        instances=instances,
+        snoop_takeover_sec=50.0,
+        verify_local_migration=True,
+        is_local_migration_confirmed=confirm,
+    )
+    mon.log = MagicMock(spec=logging.Logger)
+    br = BridgeName("vmbr0")
+    ip = IPv4Address("192.168.12.32")
+    remote = NodeID("172.16.12.13")
+    now = 1000.0
+    entries.set(
+        IPEntry(
+            ipv4=ip,
+            mac=mac,
+            bridge=br,
+            node=remote,
+            last_seen=now - 500.0,
+            snoop_origin=["arp"],
+        )
+    )
+    with patch("src.packet_monitor.time") as m_time:
+        m_time.time.return_value = now
+        mon._update_snoop_entry(mac, ip, br, "foreign", "arp", None, None)
+    entry = entries.get(ip, br, None)
+    _test_assert(entry is not None and entry.node == remote, "foreign mac ownership must stay remote")
+    _test_assert(confirm.call_count == 1, "local confirm called for foreign MAC")
+    counters = mon.migration_counters()
+    _test_assert(counters["local_refused"] == 1, "refused counter incremented")
+
+
+def test_snoop_stale_remote_refused_without_local_confirm() -> None:
+    """Stale remote must still pass local verification; no silent takeover."""
+    entries = IPEntryStore()
+    instances = InstanceStore()
+    mac = MACAddress("bc:24:11:d7:ad:5a")
+    confirm = MagicMock(return_value=False)
+    mon = _make_snoop_monitor_with_node(
+        entries,
+        node_id="172.16.12.10",
+        instances=instances,
+        snoop_takeover_sec=50.0,
+        verify_local_migration=True,
+        is_local_migration_confirmed=confirm,
+    )
+    mon.log = MagicMock(spec=logging.Logger)
+    br = BridgeName("vmbr0")
+    ip = IPv4Address("192.168.12.32")
+    remote = NodeID("172.16.12.13")
+    now = 1000.0
+    # Stale entry: last_seen far older than takeover_sec.
+    entries.set(
+        IPEntry(
+            ipv4=ip,
+            mac=mac,
+            bridge=br,
+            node=remote,
+            last_seen=now - 500.0,
+            snoop_origin=["arp"],
+        )
+    )
+    with patch("src.packet_monitor.time") as m_time:
+        m_time.time.return_value = now
+        mon._update_snoop_entry(mac, ip, br, "qemu", "arp", None, None)
+    entry = entries.get(ip, br, None)
+    _test_assert(entry is not None and entry.node == remote, "owner stays remote without local confirm")
+    _test_assert(confirm.call_count == 1, "local confirm called despite stale remote")
+    counters = mon.migration_counters()
+    _test_assert(counters["local_refused"] == 1, "refused counter incremented")
+
+
+def test_snoop_stale_remote_allowed_when_local_confirm_passes() -> None:
+    """Stale remote yields ownership only when local confirm succeeds."""
+    entries = IPEntryStore()
+    instances = InstanceStore()
+    mac = MACAddress("bc:24:11:d7:ad:5b")
+    instances.set(
+        mac,
+        InstanceInfo(
+            vmid=VMID("861"),
+            type="qemu",
+            bridge=BridgeName("vmbr0"),
+            mac=mac,
+            vlan=None,
+        ),
+    )
+    confirm = MagicMock(return_value=True)
+    mon = _make_snoop_monitor_with_node(
+        entries,
+        node_id="172.16.12.10",
+        instances=instances,
+        snoop_takeover_sec=50.0,
+        verify_local_migration=True,
+        is_local_migration_confirmed=confirm,
+    )
+    br = BridgeName("vmbr0")
+    ip = IPv4Address("192.168.12.33")
+    remote = NodeID("172.16.12.13")
+    now = 1000.0
+    entries.set(
+        IPEntry(
+            ipv4=ip,
+            mac=mac,
+            bridge=br,
+            node=remote,
+            last_seen=now - 500.0,
+            snoop_origin=["arp"],
+        )
+    )
+    with patch("src.packet_monitor.time") as m_time:
+        m_time.time.return_value = now
+        mon._update_snoop_entry(mac, ip, br, "qemu", "arp", None, instances.get(mac))
+    entry = entries.get(ip, br, None)
+    _test_assert(entry is not None and entry.node == NodeID("172.16.12.10"), "owner switches after confirm")
+    _test_assert(confirm.call_count == 1, "local confirm called on stale remote takeover")
 
 
 def test_arp_refresher_iter_active_peer_entries_basic() -> None:

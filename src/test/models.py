@@ -75,6 +75,18 @@ def test_ip_entry_to_mesh_dict() -> None:
     _test_assert(out is not None and out.get("ipv4") == "10.0.0.1" and out.get("mac") == "aa:bb:cc:dd:ee:ff", "to_mesh_dict")
 
 
+def test_ip_entry_to_mesh_dict_foreign_type_not_exported() -> None:
+    """Foreign entries are tracked locally but never meshed."""
+    entry = IPEntry(
+        ipv4=IPv4Address("192.168.12.32"),
+        mac=MACAddress("bc:24:11:d7:ad:5a"),
+        bridge=BridgeName("vmbr0"),
+        type="foreign",
+        last_seen=100.0,
+    )
+    _test_assert(entry.to_mesh_dict() is None, "foreign not exported to mesh")
+
+
 def test_ip_entry_to_mesh_dict_is_host_local_callback() -> None:
     """to_mesh_dict(is_host_local): when callback returns True, not exported; else exported."""
     # No scope set (e.g. snooped entry); callback says host-local -> not exported

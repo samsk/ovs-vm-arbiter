@@ -6,11 +6,9 @@ import sqlite3
 import time
 from typing import Optional
 
-from src.types import BridgeName, IPv4Address, MACAddress, VMID, NodeID
-from src.models import InstanceInfo, InstanceStore, NetInterface, InstanceType
+from src.types import BridgeName, InstanceType, IPv4Address, MACAddress, VMID, NodeID
+from src.models import InstanceInfo, InstanceStore, NetInterface
 from src.config import Config
-
-# InstanceType from models
 import logging
 
 

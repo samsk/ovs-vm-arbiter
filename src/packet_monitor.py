@@ -6,7 +6,7 @@ from typing import Any, Optional, List, Tuple, Callable, FrozenSet
 
 from src.types import BridgeName, EntryType, IPv4Address, MACAddress, NodeID, OFPort, SnoopOrigin
 from src.config import Config
-from src.models import InstanceStore, IPEntryStore, IPEntry, InstanceInfo, _entry_key
+from src.models import InstanceStore, IPEntryStore, IPEntry, InstanceInfo, _entry_key, is_snoopable
 from src.netlink import NetlinkInfo, PeerTracker
 from src.ovs_manager import OVSManager
 from src.of_manager import OFManager
@@ -549,7 +549,7 @@ class PacketMonitor:
     def _classify_entry(
         self, mac: MACAddress, ip: IPv4Address, instance: Optional[InstanceInfo]
     ) -> Optional[EntryType]:
-        """Determine entry type for MAC (VM/LXC/bridge).
+        """Classify snooped packet as bridge/VM/LXC/foreign.
 
         Args:
             mac: source MAC
@@ -557,19 +557,21 @@ class PacketMonitor:
             instance: instance info if MAC is VM/LXC
 
         Returns:
-            entry type or None if packet should be skipped
+            "bridge" when netlink-verified local bridge MAC on its own IP,
+            instance type when MAC is a local VM/LXC,
+            "foreign" for any other MAC on our bridge subnet (tracked locally, not meshed),
+            or None when packet should be skipped.
         """
-        # Bridge MAC only for bridge IPs (never assign VM IP to bridge MAC)
+        # Strict bridge: our bridge MAC bound to its own bridge IP.
         if self._netlink.is_bridge_mac(mac):
-            if self._netlink.bridge_mac_for_ip(ip) != mac.lower():
-                if mac.lower() not in self._skipped_bridge_mac:
-                    self._skipped_bridge_mac.add(mac.lower())
-                    self.log.debug("skip bridge mac=%s for non-bridge ip=%s", mac, ip)
-                return None
-            return "bridge"
+            if self._netlink.bridge_mac_for_ip(ip) == mac.lower():
+                return "bridge"
+            if mac.lower() not in self._skipped_bridge_mac:
+                self._skipped_bridge_mac.add(mac.lower())
+                self.log.debug("skip bridge mac=%s for non-bridge ip=%s", mac, ip)
+            return None
         if instance:
             return instance.type or "vm"
-        # Not a VM/LXC — handle as bridge/host
         if not self.snoop_bridge:
             return None
         if self._netlink.is_host_local(ip):
@@ -579,8 +581,7 @@ class PacketMonitor:
                     self._skipped_host_local.add(key)
                     self.log.info("skipping host-local address %s mac=%s", ip, mac)
                 return None
-            # snoop_host_local: allow; mesh still excludes host-local
-        # Only accept correct bridge MAC for local bridge IPs
+        # Non-bridge MAC impersonating a bridge IP: drop.
         expected_mac = self._netlink.bridge_mac_for_ip(ip)
         if expected_mac is not None and mac.lower() != expected_mac:
             if mac.lower() not in self._skipped_bridge_mac:
@@ -589,7 +590,8 @@ class PacketMonitor:
                     "skip non-bridge mac=%s ip=%s (bridge mac=%s)", mac, ip, expected_mac,
                 )
             return None
-        return "bridge"
+        # not classified otherwise
+        return "foreign"
 
     def _log_local_migration_denied(
         self,
@@ -616,7 +618,7 @@ class PacketMonitor:
             "ALERT migration denied ip=%s mac=%s bridge=%s vlan=%s "
             "current_node=%s local_node=%s reason=local_confirm_failed"
         )
-        log_fn = self.log.warning if entry_type == "bridge" else self.log.error
+        log_fn = self.log.error if is_snoopable(entry_type) else self.log.warning
         log_fn(msg, ip, mac, bridge, vlan_id, current_node, local_node)
 
     def _update_snoop_entry(
@@ -726,7 +728,7 @@ class PacketMonitor:
                 "db ip %s local ipv4=%s mac=%s bridge=%s vlan=%s type=%s",
                 "added" if cur is None else "updated", ip, mac, bridge, vlan_n, entry_type,
             )
-            if entry_type != "bridge" or cur is None:
+            if is_snoopable(entry_type) or cur is None:
                 self.log.info(
                     "snooped ipv4=%s mac=%s bridge=%s vlan=%s type=%s origin=%s",
                     ip, mac, bridge, vlan_n, entry_type, origins,
@@ -737,28 +739,41 @@ class PacketMonitor:
             takeover_sec = max(0.0, float(self.config.snoop_takeover_sec or 0.0))
             takeover_allowed = cur.can_owner_change(now, node, takeover_sec)
             if cur.node is not None and cur.node != NodeID(self.node_id):
-                # Fresh remote owner can still be overridden by explicit migration confirmation.
-                if not takeover_allowed:
-                    # Bridge IPs never migrate; skip costly DB check
-                    if entry_type == "bridge":
-                        self.log.debug("recv ip=%s kept remote node=%s (bridge, no migration)", ip, cur.node)
-                        self._last_snoop_time = now
-                        return
-                    if self.config.verify_local_migration and self._is_local_migration_confirmed is not None:
-                        if self._is_local_migration_confirmed(mac):
-                            self._migration_local_confirmed_count += 1
-                            takeover_allowed = True
-                        else:
-                            self._log_local_migration_denied(
-                                entry_type, ip, mac, bridge, vlan_n, cur.node, node
-                            )
-                            self._migration_local_refused_count += 1
-                            self._last_snoop_time = now
-                            return
+                # Bridge is netlink-verified local; reassert ownership
+                # immediately -- a remote owner here means stale/wrong mesh
+                # state that must be corrected, not a legit migration.
+                if entry_type == "bridge":
+                    self.log.warning(
+                        "ALERT bridge reclaim ip=%s mac=%s bridge=%s vlan=%s "
+                        "from=%s local=%s reason=bridge_cannot_migrate",
+                        ip, mac, bridge, vlan_n, cur.node, self.node_id,
+                    )
+                    takeover_allowed = True
+                # Remote-owned bridge (authoritative via mesh): hands off,
+                # bridges don't migrate so nothing for us to reclaim here.
+                elif cur.type == "bridge":
+                    self.log.debug(
+                        "recv ip=%s kept remote bridge node=%s mac=%s",
+                        ip, cur.node, mac,
+                    )
+                    self._last_snoop_time = now
+                    return
+                # VM/LXC/foreign: confirm MAC is local before takeover.
+                elif self.config.verify_local_migration and self._is_local_migration_confirmed is not None:
+                    if self._is_local_migration_confirmed(mac):
+                        self._migration_local_confirmed_count += 1
+                        takeover_allowed = True
                     else:
-                        self.log.debug("recv ip=%s kept remote node=%s", ip, cur.node)
+                        self._log_local_migration_denied(
+                            entry_type, ip, mac, bridge, vlan_n, cur.node, node
+                        )
+                        self._migration_local_refused_count += 1
                         self._last_snoop_time = now
                         return
+                elif not takeover_allowed:
+                    self.log.debug("recv ip=%s kept remote node=%s", ip, cur.node)
+                    self._last_snoop_time = now
+                    return
             # keep origin node on refresh; don't overwrite remote with self
             update_kw: dict[str, Any] = {
                 "last_seen": now,
