@@ -1,5 +1,6 @@
 """Tests for src.core."""
 import os
+import io
 import logging
 import time
 from unittest.mock import MagicMock, patch
@@ -247,6 +248,33 @@ def test_sync_arp_responder_flows_once_calls_of_sync() -> None:
         _test_assert(inj.call_count == 1, "inject called")
         _test_assert(gd.call_count == 1, "get_desired called")
         _test_assert(sync.call_count == 1, "sync called")
+
+
+def test_check_proxy_arp_on_monitored_bridges() -> None:
+    """Log error when monitored bridge has proxy_arp enabled."""
+    import tempfile
+    log = logging.getLogger("test_proxy_arp")
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = Config(
+            state_dir=tmp,
+            db_path=os.path.join(tmp, "x.db"),
+            bridges=["vmbr0", "vmbr1"],
+        )
+        core = ArbiterCore(cfg, log)
+
+        def _fake_open(path: str, mode: str = "r", encoding: str = "utf-8"):  # type: ignore[override]
+            if path.endswith("/vmbr0/proxy_arp"):
+                return io.StringIO("1\n")
+            if path.endswith("/vmbr1/proxy_arp"):
+                return io.StringIO("0\n")
+            raise OSError("missing")
+
+        with patch("src.core.open", side_effect=_fake_open):
+            with patch.object(core.log, "error") as err:
+                core._check_proxy_arp_on_monitored_bridges()
+        _test_assert(err.call_count == 1, "error once for proxy_arp=1 bridge")
+        _test_assert("vmbr0" in str(err.call_args[0]), "error includes bridge name")
+        _test_assert(core.runtime_counters().get("network_warnings", 0) == 1, "network warning counter incremented")
 
 
 def test_migration_invalidation_worker_executor_failure_logs_warning() -> None:

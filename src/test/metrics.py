@@ -69,7 +69,7 @@ def _build_fake_core() -> object:
         _entries=_FakeEntries([(("10.1.1.1", "vmbr0", 10), entry)]),
         _start_time=100.0,
         _node_id="10.0.0.1",
-        runtime_counters=lambda: {"owner_changes": 1, "entries_expired": 2, "entries_cleaned": 3},
+        runtime_counters=lambda: {"owner_changes": 1, "entries_expired": 2, "entries_cleaned": 3, "network_warnings": 4},
         entry_counts=lambda: {"total": 1, "active": 1, "inactive": 0},
         last_loop_tick=lambda: 120.0,
     )
@@ -92,6 +92,7 @@ def test_metrics_collector_base_names() -> None:
     _test_assert("ovs_vm_arbiter_mesh_peer_ttl_seconds" in names, "mesh peer ttl gauge exists")
     _test_assert("ovs_vm_arbiter_arp_reply_sent" in names, "arp reply counter exists")
     _test_assert("ovs_vm_arbiter_ip_migrations" in names, "ip migrations counter exists")
+    _test_assert("ovs_vm_arbiter_network_warnings_total" in names, "network warnings gauge exists")
     _test_assert("ovs_vm_arbiter_migration_refused" in names, "migration refused counter exists")
     _test_assert("ovs_vm_arbiter_remote_migration_confirmed" not in names, "remote metrics disabled by default")
 

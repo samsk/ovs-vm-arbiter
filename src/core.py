@@ -111,8 +111,20 @@ class ArbiterCore:
         self._owner_changes_count: int = 0
         self._entries_expired_count: int = 0
         self._entries_cleaned_count: int = 0
+        self._network_warnings_count: int = 0
         self._last_loop_tick: float = 0.0
         self._last_snoop_silence_warn_ts: float = 0.0
+
+    def _inc_network_warning(self) -> None:
+        """Increment aggregated network warning counter.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        self._network_warnings_count += 1
 
     def _is_list_mode(self) -> bool:
         """True when running in one-shot list mode (no daemon)."""
@@ -286,6 +298,7 @@ class ArbiterCore:
         try:
             self._migration_invalidation_queue.put_nowait((ip, bridge, vlan, old_owner, new_owner))
         except asyncio.QueueFull:
+            self._inc_network_warning()
             self.log.warning(
                 "migration invalidate queue full ip=%s bridge=%s vlan=%s owner=%s->%s",
                 ip,
@@ -429,6 +442,7 @@ class ArbiterCore:
         should_emit = last_emit <= 0.0 or (wint > 0 and (now - last_emit) >= wint)
         if should_emit:
             rtxt = ("; restart after %.0fs silent" % rsec) if rsec > 0 else ""
+            self._inc_network_warning()
             self.log.warning(
                 "no IP snooped for %.0fs (>= %.0fs); idle node may be OK%s",
                 silence,
@@ -485,12 +499,37 @@ class ArbiterCore:
         if self.config.ping_neighbours_interval <= 0:
             return
         if not raw_icmp_socket_ok():
+            self._inc_network_warning()
             self.log.warning(
                 "ping neighbours disabled: missing CAP_NET_RAW (cannot open raw ICMP socket)"
             )
             return
         self._ping_thread = threading.Thread(target=self._ping_neighbours_loop, daemon=True)
         self._ping_thread.start()
+
+    def _check_proxy_arp_on_monitored_bridges(self) -> None:
+        """Log error when monitored bridge has proxy_arp enabled.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+        """
+        for bridge in self.config.bridges:
+            path = f"/proc/sys/net/ipv4/conf/{bridge}/proxy_arp"
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    value = f.read().strip()
+            except OSError as e:
+                self.log.debug("proxy_arp check skipped bridge=%s: %s", bridge, e)
+                continue
+            if value == "1":
+                self._inc_network_warning()
+                self.log.error(
+                    "bridge %s has proxy_arp=1; this can interfere with arbiter ARP responses",
+                    bridge,
+                )
 
     def run(self) -> None:
         """Main entry point: run async loop or sync fallback."""
@@ -547,6 +586,7 @@ class ArbiterCore:
             "owner_changes": self._owner_changes_count,
             "entries_expired": self._entries_expired_count,
             "entries_cleaned": self._entries_cleaned_count,
+            "network_warnings": self._network_warnings_count,
         }
 
     def entry_counts(self) -> dict[str, int]:
@@ -578,6 +618,7 @@ class ArbiterCore:
             "started bridges=%s db=%s state_dir=%s instances=%d",
             cfg.bridges, cfg.db_path, cfg.state_dir, n_inst,
         )
+        self._check_proxy_arp_on_monitored_bridges()
         for mac, info in instances.items():
             tags_str = ",".join(info.tags) if info.tags else "-"
             self.log.info(

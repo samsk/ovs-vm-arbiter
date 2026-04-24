@@ -8,6 +8,11 @@ It is **not** a full SDN product—more like **focused glue** for people who alr
 
 **Status:** **Beta**: CLI, mesh format, and behaviour may still change. The authors already run it **in production without problems**; still **try it in your staging or lab** before you rely on it everywhere.
 
+**Entry points (this role’s `files/` tree):**
+
+- **Installed host:** `ovs-vm-arbiter.py` is a tiny launcher that `execv`s the interpreter on **`/usr/local/lib/ovs-vm-arbiter.zip`** and passes through `sys.argv[1:]`; if the zip is missing, it exits with an error. The Ansible role installs the zip and this script.
+- **Development / tests:** from the `files/` directory, `python3 -m src.main …` (or `python3 -m src.main --test`). Top-level `__main__.py` delegates to `src.main:main` for zipapp-style packaging.
+
 ## Quick start
 
 Daemon mode needs **`--service`** (systemd passes it for you). Otherwise you must use a **`--list-*`** action, **`--test`**, or **`--version`**—bare tuning flags alone exit with an error so you do not start the long-lived process by mistake.
@@ -47,16 +52,18 @@ In normal (non–list-mode) operation the process takes an exclusive lock on `<s
 | `--mesh-send-on-change`                    | on                             | Only send when entries changed                                                                                                                                                                      |
 | `--mesh-send-max-interval`                 | 99                             | Max seconds without mesh send when unchanged (0=off)                                                                                                                                                |
 | `--mesh-keepalive-interval`                | 59                             | Keepalive when 0 entries (0=off)                                                                                                                                                                    |
+| `--mesh-recv-dedup-sec`                    | 0 (off)                        | Deduplicate mesh RX within window (0=off)                                                                                                                                                           |
 | `--mesh-silence-restart`                   | on                             | Warn and restart mesh if no peer message for 10×keepalive; `--no-mesh-silence-restart` to disable                                                                                                   |
 | `--mesh-sign-key` / `--mesh-sign-key-file` | none                           | Optional HMAC-SHA256 for mesh payloads                                                                                                                                                              |
 | `--of-priority`                            | 999                            | OpenFlow mirror flow priority                                                                                                                                                                       |
+| `--arp-responder-priority`                 | 1001                           | ARP responder flow priority (must be greater than mirror `--of-priority`)                                                                                                                         |
 | `--arp-reply`                              | on                             | Answer ARP who-has for known IPs (packet-out path)                                                                                                                                                  |
 | `--arp-reinject`                           | off                            | Re-inject unknown ARP who-has to flood (`--arp-reinject` to enable)                                                                                                                                 |
 | `--arp-responder`                          | off                            | Install per-IP OpenFlow ARP responder flows (`--arp-responder` to enable)                                                                                                                           |
 | `--snoop-vlans`                            | all                            | Snoop only on these VLANs (e.g. `20,30-50,99`); 0 = untagged                                                                                                                                        |
 | `--no-snoop-vlans`                         | none                           | Do not snoop on these VLANs (list/ranges)                                                                                                                                                           |
-| `--arp-reply-strict-vlan`                  | on                             | Reply / responder only when request vlan matches snooped vlan (and optionally untagged if `--arp-reply-no-vlan`). `**--no-arp-reply-strict-vlan`:** VLAN/FDB caution in *Strict / no-vlan* section. |
-| `--arp-reply-no-vlan`                      | off                            | Also reply to untagged ARP requests (packet-out only; **ignored for arp-responder**). **VLAN/FDB caution** under *Strict / no-vlan / packet-out details*.                                           |
+| `--arp-reply-strict-vlan`                  | on                             | Reply / responder only when request vlan matches snooped vlan (and optionally untagged if `--arp-reply-no-vlan`). `--no-arp-reply-strict-vlan`: see *Strict / no-vlan* (VLAN/FDB caution).            |
+| `--arp-reply-no-vlan`                      | off                            | Also reply to untagged ARP requests (packet-out only; **ignored for arp-responder**). **VLAN/FDB caution** under *Strict / no-vlan / packet-out details*.                                            |
 | `--arp-reply-remote-vlan`                  | none                           | Tunnel VLAN (inter-host/VXLAN): match/reply for **remote** IPs on this VLAN only; local IPs use real vlan                                                                                           |
 | `--arp-reply-localize-vlan`                | on                             | When strict vlan is on, treat remote entries whose vlan is “local” like local (use entry vlan instead of remote tunnel vlan where applicable)                                                       |
 | `--tunnel-vlans` / `--tunnel-vlan`         | none                           | Shortcut: no-snoop these VLANs (so remote traffic is not attributed to local node); if single VLAN also set `arp-reply-remote-vlan` (multiple → warn)                                               |
@@ -77,7 +84,7 @@ In normal (non–list-mode) operation the process takes an exclusive lock on `<s
 - **Learns** IP→MAC per **(bridge, VLAN)** from **ARP/DHCP snooping** and read-only Proxmox `**config.db`** (VM/LXC placement).
 - **Replicates** ownership to peers over a **UDP mesh** (small JSON payloads).
 - **Handles ARP** via **mirrored packets** (userspace) and, optionally, **OpenFlow per-IP responder** flows in OVS so **who-has** does not flood the whole overlay when the design allows.
-- **Entry point:** `ovs-vm-arbiter.py` or `python -m src.main`. **All configuration is CLI flags**—no separate config file in the shipped layout. **Daemon:** pass **`--service`** (see *Quick start* / *Daemon single instance*).
+- **Entry point:** on the host, `ovs-vm-arbiter.py` runs the zip at `/usr/local/lib/ovs-vm-arbiter.zip` (see launcher in this repo). From a checkout, `python3 -m src.main` in `files/`. **All configuration is CLI flags**—no separate config file in the shipped layout. **Daemon:** pass **`--service`** (see *Quick start* / *Daemon single instance*).
 
 ### Why this approach (vs “real” SDN)
 
@@ -325,6 +332,7 @@ Both kinds can be **learned into local state** so this node can answer ARP for t
 | Option                       | Default | Meaning                                       |
 | ---------------------------- | ------- | --------------------------------------------- |
 | `--db-debounce-sec`          | 5       | Debounce after config.db change               |
+| `--db-force-debounce-sec`    | 1       | Min interval between forced DB reads (e.g. migration) |
 | `--db-periodic-sec`          | 60      | Force re-read interval                        |
 | `--db-stat-optimization`     | off     | Skip DB read when `config.db` mtime unchanged |
 | `--host-local-cache-ttl`     | 60      | Host-local address cache                      |
@@ -437,15 +445,16 @@ Examples:
 | `ovs_vm_arbiter_main_loop_tick_unixtime`             | gauge   | -                                                | Last main loop tick timestamp.                                                     |
 | `ovs_vm_arbiter_mesh_known_nodes`                    | gauge   | -                                                | Count of nodes seen via mesh receiver.                                             |
 | `ovs_vm_arbiter_mesh_peer_ttl_seconds`               | gauge   | `peer_ip`                                        | Remaining peer TTL (`mesh_ttl - peer_age`) per peer.                               |
-| `ovs_vm_arbiter_mesh_peer_messages_age_seconds`      | gauge   | -                                                | Age since last peer mesh message (`-1` means unknown).                             |
+| `ovs_vm_arbiter_mesh_peer_messages_age_seconds`     | gauge   | -                                                | Age since last peer mesh message (`-1` if unknown).                               |
 | `ovs_vm_arbiter_arp_refresh_peers_total`             | gauge   | -                                                | Active ARP refresher peer tuples.                                                  |
+| `ovs_vm_arbiter_network_warnings_total`             | gauge   | -                                                | Aggregated network warning/error style events (0 = OK).                            |
 | `ovs_vm_arbiter_arp_responder_flows_total`           | gauge   | -                                                | Installed datapath ARP responder flow count.                                       |
 | `ovs_vm_arbiter_arp_responder_flows`                 | gauge   | `bridge`                                         | Installed ARP responder flows by bridge.                                           |
 | `ovs_vm_arbiter_mesh_rx_messages_total`              | counter | -                                                | Received mesh datagrams.                                                           |
 | `ovs_vm_arbiter_mesh_tx_messages_total`              | counter | -                                                | Sent mesh datagrams (payload + keepalive).                                         |
 | `ovs_vm_arbiter_mesh_rx_invalid_total`               | counter | -                                                | Rejected mesh datagrams (bad json/signature/limits/errors).                        |
 | `ovs_vm_arbiter_owner_changes_total`                 | counter | `reason`                                         | Ownership change events (`reason="migration"`).                                    |
-| `ovs_vm_arbiter_ip_migrations_total`                 | counter | -                                                | Total IP ownership migrations.                                                     |
+| `ovs_vm_arbiter_ip_migrations_total`                 | counter | -                                                | Total IP ownership migrations (same count source as `owner_changes` for migration). |
 | `ovs_vm_arbiter_migration_refused_total`             | counter | `reason`                                         | Refused local migrations (`local_confirm_failed`).                                 |
 | `ovs_vm_arbiter_migration_confirmed_total`           | counter | `reason`                                         | Local migration confirmations (`local_confirmed`).                                 |
 | `ovs_vm_arbiter_remote_migration_confirmed_total`    | counter | -                                                | Remote migration confirmations (only when `--verify-remote-migration` is enabled). |
@@ -495,8 +504,8 @@ High-cardinality warning: extra mapping metrics can create many time-series. Kee
 
 ## Development / tests
 
-- **Installed script:** Run `ovs-vm-arbiter.py --test` to execute the built-in test suite and exit.
-- **From source checkout (this role):** Change into the `files` directory and run `python3 -m src.main --test`. This avoids clashes with the standard-library `types` module when importing `src.types`. Use `python3 -m src.main --service …` for daemon experiments from a checkout.
+- **Installed script:** `ovs-vm-arbiter.py --test` runs tests inside the deployed zip (launcher + `/usr/local/lib/ovs-vm-arbiter.zip`).
+- **From this role’s `files/` tree:** `python3 -m src.main --test` (import package is `src`, not plain `types`, to avoid clashing with the stdlib). For manual daemon runs: `python3 -m src.main --service …`. The root `__main__.py` calls `src.main:main()` for module/zipapp entry.
 
 ## How this project was built
 

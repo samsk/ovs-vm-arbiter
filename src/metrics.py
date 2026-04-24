@@ -182,6 +182,11 @@ class ArbiterMetricsCollector:
             "Cleaned expired entries.",
             value=counters["entries_cleaned"],
         )
+        yield GaugeMetricFamily(
+            "ovs_vm_arbiter_network_warnings_total",
+            "Aggregated network warning/error events; 0 means OK.",
+            value=counters.get("network_warnings", 0),
+        )
         yield CounterMetricFamily(
             "ovs_vm_arbiter_ip_migrations_total",
             "IP ownership migrations.",
