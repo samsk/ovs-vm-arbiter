@@ -94,6 +94,8 @@ class Config:
     broadcast_iface: Optional[str] = None
     node: Optional[str] = None
     snoop_bridge: bool = True
+    passive_bridges: list[str] = field(default_factory=list)  # snoop-only, no ARP reply/responder
+    bridge_subnets: dict[str, list[str]] = field(default_factory=dict)  # bridge -> list of CIDRs
     snoop_host_local: bool = True
     snoop_vlans: Optional[str] = None  # raw CLI e.g. "20,30-50,99"
     no_snoop_vlans: Optional[str] = None
@@ -204,6 +206,29 @@ class Config:
             bridges = kwargs.get("bridges") or []
             if bridges:
                 kwargs["broadcast_iface"] = bridges[0]
+        
+        # parse bridge specs for both bridges and passive_bridges
+        bridge_subnets: dict[str, list[str]] = {}
+        def _extract(tokens: list[str]) -> list[str]:
+            names = []
+            for tok in tokens:
+                name, _, subnets_raw = tok.partition(":")
+                names.append(name)
+                if subnets_raw:
+                    bridge_subnets[name] = [s.strip() for s in subnets_raw.split(",") if s.strip()]
+            return names
+        
+        kwargs["bridges"] = _extract(kwargs.get("bridges") or [])
+        kwargs["passive_bridges"] = _extract(kwargs.get("passive_bridges") or [])
+        kwargs["bridge_subnets"] = bridge_subnets
+
+        # merge passive bridges into bridges (append; keep first for broadcast_iface)
+        pb = kwargs.get("passive_bridges") or []
+        existing = list(kwargs.get("bridges") or [])
+        for b in pb:
+            if b not in existing:
+                existing.append(b)
+        kwargs["bridges"] = existing
         # default arp_responder_reply_local to arp_reply_local when not set
         if kwargs.get("arp_responder_reply_local") is None:
             kwargs["arp_responder_reply_local"] = kwargs["arp_reply_local"]

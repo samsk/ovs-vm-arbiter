@@ -45,6 +45,7 @@ def compute_desired_responders(
     for_responder: bool = False,
     local_vlans: Optional[AbstractSet[int]] = None,
     arp_reply_localize_vlan: bool = False,
+    passive_bridges: AbstractSet[str] = frozenset(),
 ) -> Set[_ResponderKey]:
     """Compute desired ARP responder set from IP entry store.
 
@@ -62,6 +63,8 @@ def compute_desired_responders(
     per_br_ip: Dict[Tuple[BridgeName, IPv4Address], MACAddress] = {}
     for _key, entry in active.items():
         if not entry.bridge:
+            continue
+        if str(entry.bridge) in passive_bridges:
             continue
         is_local = (
             node_id is None

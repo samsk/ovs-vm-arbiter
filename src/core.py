@@ -380,6 +380,7 @@ class ArbiterCore:
             for_responder=True,
             local_vlans=local_vlans,
             arp_reply_localize_vlan=cfg.arp_reply_localize_vlan,
+            passive_bridges=frozenset(cfg.passive_bridges),
         )
 
     def _expire_entries(self, now: float) -> None:

@@ -1,0 +1,4668 @@
+{
+  "title": "ovs-vm-arbiter",
+  "description": "Open vSwitch / Proxmox arbiter metrics (Prometheus scrape via signoz-agent). Panels filter host with IN $host. peer_ip / bridge variables apply where metrics carry those labels.",
+  "tags": [
+    "ovs",
+    "openvswitch",
+    "prometheus",
+    "proxmox"
+  ],
+  "version": "v5",
+  "uploadedGrafana": false,
+  "uuid": "8d2a1f3c-6b4e-5a7d-9e0f-1a2b3c4d5e6f",
+  "variables": {
+    "host": {
+      "allSelected": true,
+      "description": "Host scraping this exporter (signoz-agent)",
+      "dynamicVariablesAttribute": "host",
+      "dynamicVariablesSource": "Metrics",
+      "id": "var_host",
+      "multiSelect": true,
+      "name": "host",
+      "order": 0,
+      "showALLOption": true,
+      "sort": "ASC",
+      "type": "DYNAMIC"
+    },
+    "peer_ip": {
+      "allSelected": true,
+      "description": "Mesh peer_ip label",
+      "dynamicVariablesAttribute": "peer_ip",
+      "dynamicVariablesSource": "Metrics",
+      "id": "var_peer_ip",
+      "multiSelect": true,
+      "name": "peer_ip",
+      "order": 1,
+      "showALLOption": true,
+      "sort": "ASC",
+      "type": "DYNAMIC"
+    },
+    "bridge": {
+      "allSelected": true,
+      "description": "OVS bridge name",
+      "dynamicVariablesAttribute": "bridge",
+      "dynamicVariablesSource": "Metrics",
+      "id": "var_bridge",
+      "multiSelect": true,
+      "name": "bridge",
+      "order": 2,
+      "showALLOption": true,
+      "sort": "ASC",
+      "type": "DYNAMIC"
+    }
+  },
+  "layout": [
+    {
+      "h": 1,
+      "i": "row_overview",
+      "w": 12,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "h": 3,
+      "i": "v_ent",
+      "w": 3,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "h": 3,
+      "i": "v_ea",
+      "w": 3,
+      "x": 3,
+      "y": 1
+    },
+    {
+      "h": 3,
+      "i": "v_ei",
+      "w": 3,
+      "x": 6,
+      "y": 1
+    },
+    {
+      "h": 3,
+      "i": "v_nodes",
+      "w": 3,
+      "x": 9,
+      "y": 1
+    },
+    {
+      "h": 5,
+      "i": "g_uptime",
+      "w": 4,
+      "x": 0,
+      "y": 4
+    },
+    {
+      "h": 5,
+      "i": "g_snoop",
+      "w": 4,
+      "x": 4,
+      "y": 4
+    },
+    {
+      "h": 5,
+      "i": "g_pmsg",
+      "w": 4,
+      "x": 8,
+      "y": 4
+    },
+    {
+      "h": 5,
+      "i": "g_build",
+      "w": 6,
+      "x": 0,
+      "y": 9
+    },
+    {
+      "h": 5,
+      "i": "g_cfg",
+      "w": 6,
+      "x": 6,
+      "y": 9
+    },
+    {
+      "h": 5,
+      "i": "g_tick",
+      "w": 4,
+      "x": 0,
+      "y": 14
+    },
+    {
+      "h": 5,
+      "i": "g_msign",
+      "w": 4,
+      "x": 4,
+      "y": 14
+    },
+    {
+      "h": 5,
+      "i": "g_nwarn",
+      "w": 4,
+      "x": 8,
+      "y": 14
+    },
+    {
+      "h": 1,
+      "i": "row_mesh",
+      "w": 12,
+      "x": 0,
+      "y": 19
+    },
+    {
+      "h": 6,
+      "i": "g_mesh_rx",
+      "w": 4,
+      "x": 0,
+      "y": 20
+    },
+    {
+      "h": 6,
+      "i": "g_mesh_tx",
+      "w": 4,
+      "x": 4,
+      "y": 20
+    },
+    {
+      "h": 6,
+      "i": "g_mesh_inv",
+      "w": 4,
+      "x": 8,
+      "y": 20
+    },
+    {
+      "h": 6,
+      "i": "g_ttl",
+      "w": 12,
+      "x": 0,
+      "y": 26
+    },
+    {
+      "h": 1,
+      "i": "row_ent",
+      "w": 12,
+      "x": 0,
+      "y": 32
+    },
+    {
+      "h": 6,
+      "i": "g_own",
+      "w": 6,
+      "x": 0,
+      "y": 33
+    },
+    {
+      "h": 6,
+      "i": "g_ipmig",
+      "w": 6,
+      "x": 6,
+      "y": 33
+    },
+    {
+      "h": 6,
+      "i": "g_exp",
+      "w": 6,
+      "x": 0,
+      "y": 39
+    },
+    {
+      "h": 6,
+      "i": "g_clean",
+      "w": 6,
+      "x": 6,
+      "y": 39
+    },
+    {
+      "h": 6,
+      "i": "g_mcref",
+      "w": 6,
+      "x": 0,
+      "y": 45
+    },
+    {
+      "h": 6,
+      "i": "g_mcref2",
+      "w": 6,
+      "x": 6,
+      "y": 45
+    },
+    {
+      "h": 6,
+      "i": "g_rmok",
+      "w": 6,
+      "x": 0,
+      "y": 51
+    },
+    {
+      "h": 6,
+      "i": "g_rmno",
+      "w": 6,
+      "x": 6,
+      "y": 51
+    },
+    {
+      "h": 1,
+      "i": "row_pve",
+      "w": 12,
+      "x": 0,
+      "y": 57
+    },
+    {
+      "h": 6,
+      "i": "g_pve_i",
+      "w": 6,
+      "x": 0,
+      "y": 58
+    },
+    {
+      "h": 6,
+      "i": "g_pve_db",
+      "w": 3,
+      "x": 6,
+      "y": 58
+    },
+    {
+      "h": 6,
+      "i": "g_pve_ts",
+      "w": 3,
+      "x": 9,
+      "y": 58
+    },
+    {
+      "h": 6,
+      "i": "g_dbpoll",
+      "w": 12,
+      "x": 0,
+      "y": 64
+    },
+    {
+      "h": 1,
+      "i": "row_arp",
+      "w": 12,
+      "x": 0,
+      "y": 70
+    },
+    {
+      "h": 3,
+      "i": "g_arpp",
+      "w": 3,
+      "x": 0,
+      "y": 71
+    },
+    {
+      "h": 3,
+      "i": "g_arft",
+      "w": 3,
+      "x": 3,
+      "y": 71
+    },
+    {
+      "h": 3,
+      "i": "g_arsync",
+      "w": 6,
+      "x": 6,
+      "y": 71
+    },
+    {
+      "h": 6,
+      "i": "g_brflow",
+      "w": 12,
+      "x": 0,
+      "y": 74
+    },
+    {
+      "h": 5,
+      "i": "g_fadd",
+      "w": 6,
+      "x": 0,
+      "y": 80
+    },
+    {
+      "h": 5,
+      "i": "g_frem",
+      "w": 6,
+      "x": 6,
+      "y": 80
+    },
+    {
+      "h": 5,
+      "i": "g_arpa",
+      "w": 4,
+      "x": 0,
+      "y": 85
+    },
+    {
+      "h": 5,
+      "i": "g_arps",
+      "w": 4,
+      "x": 4,
+      "y": 85
+    },
+    {
+      "h": 5,
+      "i": "g_arpf",
+      "w": 4,
+      "x": 8,
+      "y": 85
+    },
+    {
+      "h": 5,
+      "i": "g_arpsk",
+      "w": 4,
+      "x": 0,
+      "y": 90
+    },
+    {
+      "h": 5,
+      "i": "g_rein",
+      "w": 4,
+      "x": 4,
+      "y": 90
+    },
+    {
+      "h": 5,
+      "i": "g_reif",
+      "w": 4,
+      "x": 8,
+      "y": 90
+    },
+    {
+      "h": 1,
+      "i": "row_x",
+      "w": 12,
+      "x": 0,
+      "y": 95
+    },
+    {
+      "h": 7,
+      "i": "g_minfo",
+      "w": 12,
+      "x": 0,
+      "y": 96
+    },
+    {
+      "h": 7,
+      "i": "g_mttl",
+      "w": 12,
+      "x": 0,
+      "y": 103
+    }
+  ],
+  "widgets": [
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "row_overview",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "row",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "id": "",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Overview"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "v_ent",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "value",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_entries_total",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60,
+              "reduceTo": "last"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "1e1763e6-b231-adf1-03a6-a6810474b5b4",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Entries (total)",
+      "timePreferance": "GLOBAL_TIME"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "v_ea",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "value",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_entries_active_total",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60,
+              "reduceTo": "last"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "ba06e5d8-90f7-bd04-ee8f-95ce2e933438",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Entries active",
+      "timePreferance": "GLOBAL_TIME"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "v_ei",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "value",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_entries_inactive_total",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60,
+              "reduceTo": "last"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "46483970-cb4d-0f02-b69f-14bf897d87a6",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Entries inactive",
+      "timePreferance": "GLOBAL_TIME"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "v_nodes",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "value",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_mesh_known_nodes",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60,
+              "reduceTo": "last"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "3d174bdf-3ba9-52e9-e14a-9928aa114df5",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Mesh known nodes",
+      "timePreferance": "GLOBAL_TIME"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_uptime",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_process_uptime_seconds",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "108c0250-2b41-6dba-22aa-87f1dd106693",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Process uptime (s)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_snoop",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_last_snoop_age_seconds",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "2342dece-84d5-9f45-31ec-0bee281434d3",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Last snoop age (s)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_pmsg",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_mesh_peer_messages_age_seconds",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "8203e5db-85ee-0d44-4498-1b44b96c8554",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Mesh peer messages age (s)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "Gauge 1 with version and role labels.",
+      "id": "g_build",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_build_info",
+                  "spaceAggregation": "avg",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "version",
+                  "type": "tag"
+                },
+                {
+                  "dataType": "string",
+                  "key": "role",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{version}} / {{role}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "66212bb8-9149-7b6f-f50f-74223b773636",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Build info (latest)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_cfg",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_config_info",
+                  "spaceAggregation": "avg",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "node",
+                  "type": "tag"
+                },
+                {
+                  "dataType": "string",
+                  "key": "bridges_count",
+                  "type": "tag"
+                },
+                {
+                  "dataType": "string",
+                  "key": "arp_responder_enabled",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{node}} br={{bridges_count}} arp={{arp_responder_enabled}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "ccde8dce-4722-d5db-59ed-a6ce57e9e1de",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Config info (latest)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "Unix timestamp of last tick; flat line suggests stalled loop.",
+      "id": "g_tick",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_main_loop_tick_unixtime",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "1eea1e6a-4cf1-98ea-3954-e3b78059a066",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Main loop tick (unix time)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_msign",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_mesh_sign_enabled",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "9607bbb6-0add-d6df-090a-1ff1b1ded71b",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Mesh signing enabled",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "Spikes indicate aggregated warning/error events.",
+      "id": "g_nwarn",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_network_warnings_total",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "3c471cd8-61fb-d6cf-0991-ece8f83cd649",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Network warnings (gauge)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "row_mesh",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "row",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "id": "",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Mesh"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_mesh_rx",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_mesh_rx_messages_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "062a69e8-9825-3122-0910-3bbe737593a1",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Mesh RX messages (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "ops"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_mesh_tx",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_mesh_tx_messages_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "d90b13ac-a9b9-c1d7-1cb7-2a39b482a542",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Mesh TX messages (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "ops"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_mesh_inv",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_mesh_rx_invalid_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "a34c93f6-19d1-83cb-d973-461fd9c73ceb",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Mesh RX invalid (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "ops"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "Filter peer_ip for series.",
+      "id": "g_ttl",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_mesh_peer_ttl_seconds",
+                  "spaceAggregation": "avg",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  },
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "peer_ip",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$peer_ip"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "peer_ip",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{peer_ip}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "a51e6270-e939-6857-eb1e-c3d363d0e053",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Peer TTL remaining (s)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "row_ent",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "row",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "id": "",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Entries & migrations"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_own",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_owner_changes_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "reason",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{reason}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "5fc98431-77ae-7e08-c8b3-e6f8b3c5346c",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Owner changes by reason (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "May mirror owner change semantics; rate shown as requested.",
+      "id": "g_ipmig",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_ip_migrations_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "24de185b-02eb-9eb7-8e92-f09345c4250a",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "IP migrations (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_exp",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_entries_expired_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "82cb9650-48c1-72eb-5152-78bad660d9eb",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Entries expired (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_clean",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_entries_cleaned_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "b2979f7d-8ae1-49ba-e7a7-422fc2d9420c",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Entries cleaned (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_mcref",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_migration_confirmed_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "reason",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{reason}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "d4f5d540-af59-5efc-c843-3ea8e050d805",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Migration confirmed by reason (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_mcref2",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_migration_refused_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "reason",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{reason}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "e0daa41a-9d8c-ecad-7a22-ff931a2ea163",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Migration refused by reason (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "Emitted when verify_remote_migration is enabled.",
+      "id": "g_rmok",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_remote_migration_confirmed_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "999b6ab9-a6df-07ef-5516-210033782304",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Remote migration confirmed (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "Emitted when verify_remote_migration is enabled.",
+      "id": "g_rmno",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_remote_migration_refused_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "61d89348-8355-9d7e-c93a-d8424be5f83f",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Remote migration refused (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "row_pve",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "row",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "id": "",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "PVE & DB polling"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_pve_i",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_pve_instances",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "type",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{type}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "fee796c0-db1c-7b97-fa53-133707f98e29",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "PVE instances by type (latest)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_pve_db",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "value",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_pve_config_db_ok",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60,
+              "reduceTo": "last"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "f0b2c16c-39ec-91f8-fe9a-304fd5c4f780",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "PVE config.db OK",
+      "timePreferance": "GLOBAL_TIME"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_pve_ts",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_pve_config_db_last_success_unixtime",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "53860179-bb97-2ddb-074f-b20e474f2739",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "PVE config.db last success (unix)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_dbpoll",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_db_polls_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "result",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{result}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "4177cd4d-c07f-8284-1058-9ce31459d0a0",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "DB polls by result (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "row_arp",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "row",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "id": "",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "ARP responder & flows"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_arpp",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "value",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_refresh_peers_total",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60,
+              "reduceTo": "last"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "3e77d259-ffe5-2211-311a-9346908fb8d3",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "ARP refresh peers",
+      "timePreferance": "GLOBAL_TIME"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_arft",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "value",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_responder_flows_total",
+                  "spaceAggregation": "max",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60,
+              "reduceTo": "last"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "3b889ce5-34a5-0032-8fd2-3b503cc8ef24",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "ARP responder flows (total)",
+      "timePreferance": "GLOBAL_TIME"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_arsync",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_responder_sync_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "result",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{result}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "86bafbbe-0e1a-2118-fe06-ee1d755ade5b",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "ARP responder sync by result (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "Filter bridge variable for series.",
+      "id": "g_brflow",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_responder_flows",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  },
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "bridge",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$bridge"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "bridge",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{bridge}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "7f9feaeb-d664-a3cd-2c2a-1051475828d8",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "ARP flows by bridge (latest)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_fadd",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_responder_flows_added_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "650e6340-79d5-0efd-48b2-e0e187aeee3f",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Flows added (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_frem",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_responder_flows_removed_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "b4b6e7c1-571b-89bb-e1b5-ebae443b3667",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "Flows removed (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_arpa",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_reply_attempts_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "c37bf1ed-77d6-fd98-9b79-f5efe44a483e",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "ARP reply attempts (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_arps",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_reply_sent_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "505f6294-7c0d-e701-cef8-d89d401f0e47",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "ARP replies sent (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_arpf",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_reply_failed_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "6002d9ad-05a7-ffe6-adec-4322e20131e8",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "ARP replies failed (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_arpsk",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_reply_skipped_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "6dd529b0-a8ad-48e4-48f1-936ce5fdf8bf",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "ARP replies skipped (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_rein",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_reinject_sent_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "f30bb536-b333-27cc-6d2a-66d28c0134c3",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "ARP reinject sent (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_reif",
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_arp_reinject_failed_total",
+                  "spaceAggregation": "sum",
+                  "temporality": "unspecified",
+                  "timeAggregation": "rate"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "legend": "",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "6eb28d65-9757-5256-c111-4e816c60da61",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "title": "ARP reinject failed (rate)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "row_x",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "row",
+      "query": {
+        "builder": {
+          "queryData": [],
+          "queryFormulas": []
+        },
+        "id": "",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Extra mappings (--prometheus-metrics-extra)"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "Only with prometheus_metrics_extra. Heavy series count.",
+      "id": "g_minfo",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_entry_mapping_info",
+                  "spaceAggregation": "avg",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "ip",
+                  "type": "tag"
+                },
+                {
+                  "dataType": "string",
+                  "key": "mac",
+                  "type": "tag"
+                },
+                {
+                  "dataType": "string",
+                  "key": "bridge",
+                  "type": "tag"
+                },
+                {
+                  "dataType": "string",
+                  "key": "vlan",
+                  "type": "tag"
+                },
+                {
+                  "dataType": "string",
+                  "key": "node",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{ip}} {{mac}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "34701ab8-f454-f081-5df2-a1293479a747",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Entry mapping info (high cardinality)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    },
+    {
+      "contextLinks": {
+        "linksData": []
+      },
+      "description": "",
+      "id": "g_mttl",
+      "nullZeroValues": "transparent",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregations": [
+                {
+                  "metricName": "ovs_vm_arbiter_entry_mapping_ttl_seconds",
+                  "spaceAggregation": "avg",
+                  "temporality": "unspecified",
+                  "timeAggregation": "latest"
+                }
+              ],
+              "dataSource": "metrics",
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "key": {
+                      "dataType": "string",
+                      "key": "host",
+                      "type": "tag"
+                    },
+                    "op": "IN",
+                    "value": "$host"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "key": "ip",
+                  "type": "tag"
+                },
+                {
+                  "dataType": "string",
+                  "key": "mac",
+                  "type": "tag"
+                },
+                {
+                  "dataType": "string",
+                  "key": "bridge",
+                  "type": "tag"
+                }
+              ],
+              "legend": "{{ip}} @{{bridge}}",
+              "orderBy": [],
+              "queryName": "A",
+              "selectColumns": [],
+              "stepInterval": 60
+            }
+          ],
+          "queryFormulas": []
+        },
+        "id": "ba52d71e-b64e-8558-84ba-8a8497b47e45",
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        {
+          "fieldContext": "log",
+          "name": "timestamp",
+          "signal": "logs",
+          "type": "log"
+        },
+        {
+          "fieldContext": "log",
+          "name": "body",
+          "signal": "logs",
+          "type": "log"
+        }
+      ],
+      "selectedTracesFields": [
+        {
+          "fieldContext": "resource",
+          "fieldDataType": "string",
+          "name": "service.name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "fieldDataType": "string",
+          "name": "name",
+          "signal": "traces"
+        },
+        {
+          "fieldContext": "span",
+          "name": "duration_nano",
+          "signal": "traces"
+        }
+      ],
+      "softMax": null,
+      "softMin": null,
+      "title": "Entry mapping TTL (s)",
+      "legendPosition": "bottom",
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short"
+    }
+  ]
+}

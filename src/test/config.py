@@ -239,6 +239,63 @@ def test_config_list_mode_mask() -> None:
     _test_assert(cfg.list_mode_mask == expected, "list_mode_mask bitset")
 
 
+def test_config_bridge_spec_parsed() -> None:
+    """Config.from_args parses BR:CIDR specs and populates bridge_subnets."""
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "--service",
+            "--bridges", "vmbr0", "vmbr1:10.0.0.0/24,10.0.1.0/24",
+            "--passive-bridges", "vmbr00:192.168.12.0/27", "vmbr00",
+        ]
+    )
+    cfg = Config.from_args(args)
+    _test_assert(cfg.bridges == ["vmbr0", "vmbr1", "vmbr00"], "bridges stripped and merged")
+    _test_assert(cfg.passive_bridges == ["vmbr00", "vmbr00"], "passive_bridges stripped but not deduped yet")
+    _test_assert(cfg.bridge_subnets["vmbr1"] == ["10.0.0.0/24", "10.0.1.0/24"], "vmbr1 subnets")
+    _test_assert(cfg.bridge_subnets["vmbr00"] == ["192.168.12.0/27"], "vmbr00 subnets")
+    _test_assert("vmbr0" not in cfg.bridge_subnets, "no subnets for vmbr0")
+
+
+def test_config_bridge_spec_same_bridge_twice_last_subnets_win() -> None:
+    """Duplicate bridge name in --bridges: later token overwrites bridge_subnets."""
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "--service",
+            "--bridges",
+            "vmbr0",
+            "vmbr1:192.168.1.0/24",
+            "vmbr1:10.0.0.0/8",
+        ]
+    )
+    cfg = Config.from_args(args)
+    _test_assert(cfg.bridge_subnets["vmbr1"] == ["10.0.0.0/8"], "last vmbr1 spec wins")
+
+
+def test_config_passive_bridges_merged_into_bridges() -> None:
+    """--passive-bridges appended to bridges; broadcast_iface stays first bridge."""
+    parser = build_parser()
+    args = parser.parse_args(
+        ["--service", "--bridges", "vmbr0", "--passive-bridges", "vmbr00"]
+    )
+    cfg = Config.from_args(args)
+    _test_assert("vmbr00" in cfg.bridges, "passive bridge merged into bridges")
+    _test_assert(cfg.bridges[0] == "vmbr0", "vmbr0 still first")
+    _test_assert(cfg.passive_bridges == ["vmbr00"], "passive_bridges preserved")
+    _test_assert(cfg.broadcast_iface == "vmbr0", "broadcast_iface from first bridge")
+
+
+def test_config_passive_bridges_dedup() -> None:
+    """Bridge in both --bridges and --passive-bridges is not duplicated."""
+    parser = build_parser()
+    args = parser.parse_args(
+        ["--service", "--bridges", "vmbr0", "vmbr00", "--passive-bridges", "vmbr00"]
+    )
+    cfg = Config.from_args(args)
+    _test_assert(cfg.bridges.count("vmbr00") == 1, "no duplicate")
+
+
 def test_config_prometheus_flags() -> None:
     """Prometheus flags parse to Config fields."""
     parser = build_parser()

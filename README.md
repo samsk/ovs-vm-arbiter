@@ -41,7 +41,8 @@ In normal (non–list-mode) operation the process takes an exclusive lock on `<s
 | Option                                     | Default                        | Meaning                                                                                                                                                                                             |
 | ------------------------------------------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--service`                                | off                            | Run as long-lived daemon; **required** for that mode unless using `--list-*` / `--test` / `--version`                                                                                                |
-| `--bridges`                                | vmbr0                          | OVS bridges to monitor                                                                                                                                                                              |
+| `--bridges`                                | vmbr0                          | OVS bridges to monitor. Optional per-bridge subnets: `BR:CIDR[,CIDR…]` (e.g. `vmbr1:10.0.0.0/24`). See *Passive bridges and bridge-subnet ownership*.                                                |
+| `--passive-bridges`                        | none                           | Extra bridges to **snoop only** (mirror + sniff): no userspace ARP reply/reinject, no OpenFlow ARP responder on those bridges. Same `BR:CIDR` syntax as `--bridges`. Names are merged into the monitored bridge list after the explicit `--bridges` entries. |
 | `--db-path`                                | /var/lib/pve-cluster/config.db | Proxmox config DB (read-only)                                                                                                                                                                       |
 | `--state-dir`                              | /var/lib/ovs-vm-arbiter        | State JSON dir                                                                                                                                                                                      |
 | `--port`                                   | 9876                           | UDP mesh port                                                                                                                                                                                       |
@@ -70,8 +71,52 @@ In normal (non–list-mode) operation the process takes an exclusive lock on `<s
 | `--arp-reply-set-register`                 | 0                              | On ARP reply packet-out, load value into NXM_NX_REG0[] (0=off); e.g. 1 for downstream flow matching                                                                                                 |
 | `--arp-responder-vlan-register`            | unset                          | Match VLAN by NXM_NX_REG[]=vlan (N=0-7) instead of vlan_tci; use when OVS doesn't see 802.1Q                                                                                                        |
 | `--arp-responder-learning`                 | on                             | Responder uses `learn()` so the bridge learns the response MAC on the node port                                                                                                                     |
-| `--exclude-subnet`                         | none                           | Exclude CIDR(s) from snooping (repeatable)                                                                                                                                                          |
+| `--exclude-subnet`                         | none                           | Exclude CIDR(s) from snooping on **all** bridges (repeatable). Unlike bridge-subnet ownership, this drops learning entirely for those IPs.                                                        |
 | `--ping-neighbours`                        | 0 (off)                        | Ping mesh neighbours from host every SEC; native ICMP, no reply wait; random order, 0–50 ms between pings                                                                                           |
+
+
+## Passive bridges and bridge-subnet ownership
+
+Use this when you run **more than one OVS bridge** on a host (e.g. **vlan-aware `vmbr0`** for VXLAN guests and a **second bridge `vmbr00`** for another segment) and the arbiter should **learn on both** but only **answer ARP** on the primary bridge.
+
+### `--passive-bridges`
+
+- Passive bridges get the same **mirror flows** and **Scapy sniff** as `--bridges`, so ARP/DHCP still **refresh** `IPEntryStore` and the **UDP mesh**.
+- On a passive bridge the daemon **does not** send userspace ARP replies or reinject unknown ARP, and **ARP responder flow sync** skips store entries whose `bridge` is passive (no per-IP responder flows on that bridge).
+
+Example:
+
+```bash
+ovs-vm-arbiter.py --service --bridges vmbr0 --passive-bridges vmbr00 …
+```
+
+**Passive + `BR:CIDR`:** add subnets on the passive token when that bridge is where you **trust snoop for those guest networks**, but another **`--bridges`** interface still **sees the same source IPs** (mirror, patch port, or overlay leakage). The CIDR ties those addresses to the passive bridge so duplicate ARP/DHCP on the primary bridge is **ignored** for store updates; if there is no such overlap, plain `vmbr00` without CIDR is enough.
+
+### `BR:CIDR` syntax (bridge-subnet ownership)
+
+Any token on `--bridges` or `--passive-bridges` may be either plain **`BR`** or **`BR:192.168.12.0/27,10.0.1.0/24`** (comma-separated IPv4 CIDRs, spaces stripped).
+
+**Semantics:** for each declared CIDR, that network is treated as **owned by that bridge**. If a packet’s **source IP** falls in a CIDR owned by bridge **A**, snooping on bridge **B** (B ≠ A) is **silently skipped** in `_is_valid_snoop`—so stray copies of the same ARP on another bridge do **not** trigger migration / ownership fights. Snooping on **A** still runs normally (including passive-only rules on **A**).
+
+**ARP replies on the “wrong” bridge** are unchanged: fast-path reply uses the **store**, not whether the current sniff interface matched ownership, so neighbours can still get answers on `vmbr0` when the store was filled from `vmbr00`.
+
+**Lookup cost:** declared networks are sorted by **prefix length (longest first)**; the first match wins. A small **per-IP cache** (`ip string → owner bridge | None`) avoids rescanning networks for every repeated ARP.
+
+**Caveats:**
+
+- If the same bridge name appears twice with different `BR:CIDR` lists, **later tokens overwrite** `bridge_subnets` for that name (documented behaviour).
+- Invalid CIDR strings are **logged and ignored**; other CIDRs on that bridge still apply.
+- `BR:CIDR` is **not** a substitute for correct OVS isolation—it encodes **your** intent so the arbiter ignores cross-leakage.
+
+Combined example (VXLAN bridge + passive second bridge + ownership for the /27):
+
+```bash
+ovs-vm-arbiter.py --service \
+  --bridges vmbr0 \
+  --passive-bridges vmbr00:192.168.12.0/27 \
+  --tunnel-vlan 10 \
+  …
+```
 
 
 ## Technical overview
@@ -308,7 +353,7 @@ Both kinds can be **learned into local state** so this node can answer ARP for t
 
 ### What gets learned
 
-- **Guests:** From **snooping** on `--bridges`, from **Proxmox `config.db`** where relevant, and from **mesh** updates from peers.
+- **Guests:** From **snooping** on all monitored bridges (`--bridges` plus merged `--passive-bridges`), from **Proxmox `config.db`** where relevant, and from **mesh** updates from peers.
 - **Local bridge IPs:** Identified using the host’s **routing / address tables** (loopback, unusable zero address, and addresses marked **host scope** on an interface—i.e. “belongs to this machine”). `**--snoop-host-local`** (default **on**) allows those to be learned from the wire as well so ARP for the hypervisor IP works; `**--no-snoop-host-local`** skips learning them from snoop.
 
 ### What gets sent on the mesh
@@ -342,12 +387,12 @@ Both kinds can be **learned into local state** so this node can answer ARP for t
 
 ## Architecture (for humans and LLMs)
 
-- **Config** (`config.py`): Single dataclass; built from CLI via `Config.from_args(argparse.Namespace)`.
+- **Config** (`config.py`): Single dataclass; built from CLI via `Config.from_args(argparse.Namespace)` (parses `BR:CIDR` on `--bridges` / `--passive-bridges`, merges passive bridge names into the monitored list).
 - **IPEntry** (`models.py`): One IP→MAC; key = (ipv4, bridge, vlan). Fields: ipv4, mac, bridge, vlan, node, last_seen, last_received, expired, scope. `expired` set when TTL elapsed; then removed after `expired_entry_cleanup_sec`.
 - **IPEntryStore** (`models.py`): Thread-safe store keyed by (ip, bridge, vlan). Methods: get, set, update, discard, get_active, get_entries_for_bridge_ip, get_any_active_for_bridge_ip, items, keys, to_dict, load_from_dict.
 - **ArbiterCore** (`core.py`): Owns store, InstanceWatcher, PacketMonitor, MeshBroadcaster, OVSManager, OFManager, StateManager. Main loop: poll instances, mesh silence check (warn+restart if no recv for 10×keepalive), _expire_entries, _cleanup_expired_entries, save, mesh send/recv, OF verify, ARP responder sync. Optional _ping_neighbours_loop (when ping_neighbours_interval > 0): pings mesh neighbours from host via native ICMP.
 - **InstanceWatcher**: Polls Proxmox config.db; returns InstanceStore (MAC→InstanceInfo).
-- **PacketMonitor**: ARP/DHCP snoop per bridge; updates IPEntryStore; optional ARP reply and reinject. **Per-VLAN snoop**: at most one snooped VLAN per (ip, bridge); does not overwrite remote node when seeing VM on local VLAN; same-VLAN re-sight sets node=self (VM moved); after TTL expiry can snoop on another VLAN. **ARP reply** gated by `arp_reply_strict_vlan`, `arp_reply_no_vlan`, and `arp_reply_remote_vlan` (local=entry vlan, remote=tunnel vlan when set); reply_vlan used for packet and in_port. **ARP reinject**: unknown who-has re-injected to flood; debug logs who-has and bridge/vlan. Filter by `--snoop-vlans` / `--no-snoop-vlans`.
+- **PacketMonitor**: ARP/DHCP snoop per bridge; updates IPEntryStore; optional ARP reply and reinject. **Passive bridges** (`--passive-bridges`): snoop without ARP reply/reinject on those interfaces. **Bridge-subnet ownership** (`BR:CIDR` on bridge flags): skip snoop when source IP is in a CIDR declared for another bridge (longest-prefix match + per-IP cache). **Per-VLAN snoop**: at most one snooped VLAN per (ip, bridge); does not overwrite remote node when seeing VM on local VLAN; same-VLAN re-sight sets node=self (VM moved); after TTL expiry can snoop on another VLAN. **ARP reply** gated by `arp_reply_strict_vlan`, `arp_reply_no_vlan`, and `arp_reply_remote_vlan` (local=entry vlan, remote=tunnel vlan when set); reply_vlan used for packet and in_port. **ARP reinject**: unknown who-has re-injected to flood; debug logs who-has and bridge/vlan. Filter by `--snoop-vlans` / `--no-snoop-vlans`.
 - **MeshBroadcaster**: UDP broadcast; send state keyed by "|bridge|vlan"; receive merges into store (node from payload). Optional HMAC.
 - **OFManager**: Mirror flows + ARP responder flows; sync from IPEntryStore via compute_desired_responders (strict/no_vlan/arp_reply_remote_vlan, for_responder=True) + sync_arp_responder_flows.
 - **StateManager**: Load/save IPEntryStore to state.json.
@@ -359,7 +404,7 @@ Both kinds can be **learned into local state** so this node can answer ARP for t
 | Module                | Role                                                                                                                 |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | main.py               | Entry; CLI; Config.from_args; ArbiterCore.run or list dumps; tunnel-vlan merge; daemon lock; `--version`             |
-| config.py             | Config dataclass, from_args, get_node_ip, registry paths; list mode bitmasks                                         |
+| config.py             | Config dataclass, from_args (bridge `BR:CIDR` parsing, passive merge), get_node_ip, registry paths; list mode bitmasks |
 | core.py               | ArbiterCore: main loop, _expire_entries, _cleanup_expired_entries, _ping_neighbours_loop, snoop silence warn/restart |
 | icmp_ping.py          | send_icmp_echo: native ICMP echo (no subprocess); used by ping-neighbours                                            |
 | models.py             | IPEntry, IPEntryKey, IPEntryStore, InstanceInfo, InstanceStore                                                       |
@@ -368,12 +413,12 @@ Both kinds can be **learned into local state** so this node can answer ARP for t
 | netlink.py            | NetlinkInfo; PeerTracker; bridge identity / host-local                                                               |
 | ttl_cache.py          | TTLCache; used by NetlinkInfo and OVSManager                                                                         |
 | ovs_cmd.py            | OVSCommand: ovs-vsctl / ovs-ofctl subprocess helpers                                                                 |
-| packet_monitor.py     | Snoop ARP/DHCP; update store; inject_config_ips; ArpRefresher hook; ARP reply/reinject                               |
+| packet_monitor.py     | Snoop ARP/DHCP; passive bridges; bridge-subnet ownership filter; update store; inject_config_ips; ArpRefresher hook; ARP reply/reinject                               |
 | packet_monitor_arp.py | Shared ARP packet builders for monitor                                                                               |
-| arp_refresher.py      | ArpRefresher thread: periodic ARP for FDB refresh                                                                    |
+| arp_refresher.py      | ArpRefresher thread: periodic ARP refresh for FDB                                                                     |
 | logging_util.py       | DebugDedupFilter; setup_logging                                                                                      |
 | mesh.py               | MeshBroadcaster send/recv; HMAC optional; node from payload; get_last_recv_any() for silence watchdog                |
-| of_manager.py         | ensure_flows, sync_arp_responder_flows, compute_desired_responders                                                   |
+| of_manager.py         | ensure_flows, sync_arp_responder_flows, compute_desired_responders (passive-bridge entries excluded)                  |
 | ovs_manager.py        | ovs-vsctl; get_bridge_node_to_ofport; remote_ip cache; dump_remote_ips, dump_local_ips                               |
 | packet_out.py         | PacketOutRequest; AsyncPacketSender queue                                                                            |
 | flow_registry.py      | Cookie from /run/ovs-flow-registry                                                                                   |

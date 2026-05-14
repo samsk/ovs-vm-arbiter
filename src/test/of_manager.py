@@ -443,6 +443,34 @@ def test_compute_desired_responders_remote_localize_uses_entry_vlan() -> None:
     _test_assert(len(d) == 1, "remote, localized: one key")
 
 
+def test_compute_desired_responders_passive_bridges() -> None:
+    """Entries on passive bridges excluded from desired responder set."""
+    from src.of_manager import compute_desired_responders
+
+    entries = IPEntryStore()
+    br_active = BridgeName("vmbr0")
+    br_passive = BridgeName("vmbr00")
+    now = time.time()
+    ip_active = IPv4Address("10.0.0.1")
+    mac_active = MACAddress("aa:bb:cc:dd:ee:01")
+    ip_passive = IPv4Address("10.0.1.1")
+    mac_passive = MACAddress("aa:bb:cc:dd:ee:02")
+    entries.set(IPEntry(ipv4=ip_active, mac=mac_active, bridge=br_active, last_seen=now))
+    entries.set(IPEntry(ipv4=ip_passive, mac=mac_passive, bridge=br_passive, last_seen=now))
+
+    desired = compute_desired_responders(
+        entries,
+        300.0,
+        [br_active, br_passive],
+        passive_bridges=frozenset({"vmbr00"}),
+    )
+    _test_assert((br_active, ip_active, mac_active, None) in desired, "active bridge entry included")
+    _test_assert(
+        not any(ip == ip_passive for (_, ip, _, _) in desired),
+        "passive bridge entry excluded",
+    )
+
+
 def test_sync_arp_responder_flows_strict_no_vlan_installs_both() -> None:
     """sync_arp_responder_flows: desired with both (vlan) and (None) installs two flows."""
     from src.of_manager import compute_desired_responders

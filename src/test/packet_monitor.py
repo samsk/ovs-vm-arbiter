@@ -134,6 +134,7 @@ def _make_monitor(
     arp_reply_localize_vlan: bool = True,
     debug_flags: int = 0,
     local_vlans: Optional[set[int]] = None,
+    passive_bridges: Optional[list[str]] = None,
 ) -> PacketMonitor:
     """Minimal PacketMonitor with optional _resolve_in_port returning in_port."""
     log = logging.getLogger("test")
@@ -145,6 +146,7 @@ def _make_monitor(
         arp_reply_no_vlan=arp_reply_no_vlan,
         arp_reply_localize_vlan=arp_reply_localize_vlan,
         debug_flags=debug_flags,
+        passive_bridges=passive_bridges or [],
     )
     ovs_mock = MagicMock()
     ovs_mock.get_bridge_vlan_to_local_port.return_value = {}
@@ -250,6 +252,40 @@ def test_do_arp_reply_handles_all_arp_packets() -> None:
         )
         ok3 = mon._do_arp_reply(pkt_untagged2, br, "test")
     _test_assert(ok3 is True, "untagged who-has finds any active entry (reply on req vlan)")
+
+
+def test_do_arp_reply_passive_bridge_skipped() -> None:
+    """_do_arp_reply returns False when bridge is passive (no packet-out)."""
+    if Ether is None or ARP is None:
+        raise AssertionError("scapy required")
+    entries = IPEntryStore()
+    ip = IPv4Address("192.168.12.5")
+    mac = MACAddress("aa:bb:cc:dd:ee:ff")
+    br = BridgeName("vmbr00")
+    now = 1000.0
+    entries.set(IPEntry(ipv4=ip, mac=mac, bridge=br, last_seen=now - 100.0))
+    mon = _make_monitor(entries, bridge="vmbr00", resolve_port="3", passive_bridges=["vmbr00"])
+    pkt = Ether(src="00:00:00:00:00:01", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, psrc="192.168.13.1", pdst="192.168.12.5"
+    )
+    with patch("src.packet_monitor.time.time", return_value=now):
+        ok = mon._do_arp_reply(pkt, br, "test")
+    _test_assert(ok is False, "passive bridge -> no reply")
+    _test_assert(not mon.of_manager.send_packet_out.called, "send_packet_out not called")
+
+
+def test_send_arp_reply_passive_bridge_skips_reinject() -> None:
+    """_send_arp_reply skips reinject on passive bridge when arp_reinject is on."""
+    if Ether is None or ARP is None:
+        raise AssertionError("scapy required")
+    br = BridgeName("vmbr00")
+    mon = _make_monitor(entries=IPEntryStore(), bridge="vmbr00", arp_reply=True, passive_bridges=["vmbr00"])
+    mon.config.arp_reinject = True
+    pkt = Ether(src="00:00:00:00:00:01", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, psrc="192.168.13.1", pdst="192.168.12.99"
+    )
+    mon._send_arp_reply(pkt, br, False)
+    _test_assert(not mon.of_manager.send_packet_out_async.called, "reinject skipped on passive bridge")
 
 
 def test_do_arp_reply_negative() -> None:
@@ -944,15 +980,17 @@ def _make_snoop_monitor(
     is_bridge_mac: bool = False,
     bridge_mac_for_ip: Optional[str] = None,
     is_host_local: bool = False,
+    bridge_subnets: Optional[dict[str, list[str]]] = None,
 ) -> PacketMonitor:
     """Monitor with netlink mocked for snooping tests; default = allow snoop."""
     log = logging.getLogger("test")
     inst = instances or InstanceStore()
     cfg = Config(
-        bridges=[bridge],
+        bridges=[bridge, "vmbr1", "vmbr00"],
         snoop_bridge=snoop_bridge,
         snoop_host_local=snoop_host_local,
         exclude_subnets=exclude_subnets or [],
+        bridge_subnets=bridge_subnets or {},
     )
     ovs_mock = MagicMock()
     ovs_mock.get_bridge_vlan_to_local_port.return_value = {}
@@ -1097,6 +1135,137 @@ def test_snoop_excluded_subnet_skipped() -> None:
     mon._handle_packet(pkt, br)
     entry = entries.get(IPv4Address("192.168.100.10"), br, None)
     _test_assert(entry is None, "excluded subnet -> no entry")
+
+
+def test_snoop_bridge_subnet_skipped_on_wrong_bridge() -> None:
+    """IP in declared subnet is silently skipped on wrong bridge."""
+    if Ether is None or ARP is None:
+        raise AssertionError("scapy required")
+    entries = IPEntryStore()
+    mon = _make_snoop_monitor(entries, bridge_subnets={"vmbr00": ["192.168.12.0/27"]})
+    
+    # IP in subnet, but snooped on vmbr0 -> skipped
+    br_wrong = BridgeName("vmbr0")
+    pkt1 = Ether(src="aa:bb:cc:dd:ee:ff", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, hwsrc="aa:bb:cc:dd:ee:ff", psrc="192.168.12.10", pdst="192.168.12.1"
+    )
+    mon._handle_packet(pkt1, br_wrong)
+    _test_assert(entries.get(IPv4Address("192.168.12.10"), br_wrong, None) is None, "skipped on wrong bridge")
+
+    # Same IP, snooped on vmbr00 -> allowed
+    br_right = BridgeName("vmbr00")
+    pkt2 = Ether(src="aa:bb:cc:dd:ee:ff", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, hwsrc="aa:bb:cc:dd:ee:ff", psrc="192.168.12.10", pdst="192.168.12.1"
+    )
+    mon._handle_packet(pkt2, br_right)
+    _test_assert(entries.get(IPv4Address("192.168.12.10"), br_right, None) is not None, "allowed on correct bridge")
+
+    # IP outside subnet -> allowed on vmbr0
+    pkt3 = Ether(src="aa:bb:cc:dd:ee:ff", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, hwsrc="aa:bb:cc:dd:ee:ff", psrc="192.168.12.100", pdst="192.168.12.1"
+    )
+    mon._handle_packet(pkt3, br_wrong)
+    _test_assert(entries.get(IPv4Address("192.168.12.100"), br_wrong, None) is not None, "outside subnet allowed")
+
+
+def test_snoop_bridge_subnet_cache_hit() -> None:
+    """Bridge subnet cache is populated and used."""
+    if Ether is None or ARP is None:
+        raise AssertionError("scapy required")
+    entries = IPEntryStore()
+    mon = _make_snoop_monitor(entries, bridge_subnets={"vmbr00": ["192.168.12.0/27"]})
+    br_wrong = BridgeName("vmbr0")
+    pkt = Ether(src="aa:bb:cc:dd:ee:ff", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, hwsrc="aa:bb:cc:dd:ee:ff", psrc="192.168.12.10", pdst="192.168.12.1"
+    )
+    
+    _test_assert("192.168.12.10" not in mon._bridge_subnet_cache, "cache empty initially")
+    mon._handle_packet(pkt, br_wrong)
+    _test_assert(mon._bridge_subnet_cache["192.168.12.10"] == "vmbr00", "cache populated with owner")
+    
+    # Second packet uses cache
+    mon._handle_packet(pkt, br_wrong)
+    _test_assert(entries.get(IPv4Address("192.168.12.10"), br_wrong, None) is None, "still skipped")
+
+
+def test_snoop_bridge_subnet_longest_prefix() -> None:
+    """Longest prefix match wins for overlapping subnets."""
+    if Ether is None or ARP is None:
+        raise AssertionError("scapy required")
+    entries = IPEntryStore()
+    # vmbr1 has /24, vmbr00 has more specific /27
+    mon = _make_snoop_monitor(entries, bridge_subnets={
+        "vmbr1": ["192.168.12.0/24"],
+        "vmbr00": ["192.168.12.0/27"]
+    })
+    
+    # 192.168.12.10 is in both; /27 wins -> owner is vmbr00
+    br_wrong = BridgeName("vmbr1")
+    pkt = Ether(src="aa:bb:cc:dd:ee:ff", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, hwsrc="aa:bb:cc:dd:ee:ff", psrc="192.168.12.10", pdst="192.168.12.1"
+    )
+    mon._handle_packet(pkt, br_wrong)
+    _test_assert(mon._bridge_subnet_cache["192.168.12.10"] == "vmbr00", "longest prefix wins")
+
+
+def test_snoop_bridge_subnet_empty_no_cross_bridge_filter() -> None:
+    """No bridge_subnets: no ownership filter; snoop on vmbr0 unchanged."""
+    if Ether is None or ARP is None:
+        raise AssertionError("scapy required")
+    entries = IPEntryStore()
+    mon = _make_snoop_monitor(entries, bridge_subnets={})
+    _test_assert(len(mon._bridge_subnet_nets) == 0, "no nets when empty map")
+    br = BridgeName("vmbr0")
+    pkt = Ether(src="aa:bb:cc:dd:ee:ff", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, hwsrc="aa:bb:cc:dd:ee:ff", psrc="192.168.12.10", pdst="192.168.1.1"
+    )
+    mon._handle_packet(pkt, br)
+    _test_assert(entries.get(IPv4Address("192.168.12.10"), br, None) is not None, "no filter without declarations")
+
+
+def test_snoop_bridge_subnet_ip_outside_declared_nets_not_skipped() -> None:
+    """IP not in any declared CIDR: cache None; snoop on any bridge proceeds."""
+    if Ether is None or ARP is None:
+        raise AssertionError("scapy required")
+    entries = IPEntryStore()
+    mon = _make_snoop_monitor(entries, bridge_subnets={"vmbr00": ["192.168.12.0/27"]})
+    br0 = BridgeName("vmbr0")
+    ip_out = "10.0.0.50"
+    pkt = Ether(src="aa:bb:cc:dd:ee:ff", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, hwsrc="aa:bb:cc:dd:ee:ff", psrc=ip_out, pdst="10.0.0.1"
+    )
+    mon._handle_packet(pkt, br0)
+    _test_assert(mon._bridge_subnet_cache.get(ip_out) is None, "outside nets -> cached None")
+    _test_assert(entries.get(IPv4Address(ip_out), br0, None) is not None, "snoop on vmbr0 allowed")
+
+
+def test_snoop_bridge_subnet_invalid_cidr_ignored() -> None:
+    """Invalid CIDR in list is skipped; valid CIDR still enforces ownership."""
+    if Ether is None or ARP is None:
+        raise AssertionError("scapy required")
+    entries = IPEntryStore()
+    mon = _make_snoop_monitor(
+        entries,
+        bridge_subnets={"vmbr00": ["not-a-valid-cidr", "192.168.12.0/27"]},
+    )
+    _test_assert(len(mon._bridge_subnet_nets) == 1, "only valid network kept")
+    br0 = BridgeName("vmbr0")
+    pkt = Ether(src="aa:bb:cc:dd:ee:ff", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, hwsrc="aa:bb:cc:dd:ee:ff", psrc="192.168.12.10", pdst="192.168.12.1"
+    )
+    mon._handle_packet(pkt, br0)
+    _test_assert(entries.get(IPv4Address("192.168.12.10"), br0, None) is None, "valid CIDR still skips wrong bridge")
+
+
+def test_is_valid_snoop_bridge_subnet_same_owner_returns_true() -> None:
+    """_is_valid_snoop True on owner bridge when IP matches declared subnet."""
+    entries = IPEntryStore()
+    mon = _make_snoop_monitor(entries, bridge_subnets={"vmbr00": ["192.168.12.0/27"]})
+    mac = MACAddress("aa:bb:cc:dd:ee:ff")
+    ip = IPv4Address("192.168.12.10")
+    br = BridgeName("vmbr00")
+    ok = mon._is_valid_snoop(mac, ip, br)
+    _test_assert(ok is True, "owner bridge accepts snoop for declared IP")
 
 
 def test_snoop_host_local_skipped() -> None:

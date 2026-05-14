@@ -73,6 +73,21 @@ class PacketMonitor:
         self._arp_flood_sources: dict[str, dict[str, int]] = {}
         # Shared netlink helper
         self._netlink = netlink or NetlinkInfo(self.bridges, config)
+        
+        # bridge-subnet ownership: sorted by prefix length desc (longest-prefix match)
+        _raw: list[tuple[Any, str]] = []
+        for br_name, cidrs in config.bridge_subnets.items():
+            for cidr in cidrs:
+                try:
+                    _raw.append((ipaddress.ip_network(cidr, strict=False), br_name))
+                except ValueError:
+                    log.warning("invalid bridge subnet %s for %s, ignoring", cidr, br_name)
+        self._bridge_subnet_nets: list[tuple[Any, str]] = sorted(
+            _raw, key=lambda t: t[0].prefixlen, reverse=True
+        )
+        # cache: ip_str -> owner_bridge_name | None
+        self._bridge_subnet_cache: dict[str, Optional[str]] = {}
+
         self._last_snoop_time: float = 0.0  # for snoop-silence watchdog
         self._get_local_vlans = get_local_vlans
         self._is_local_migration_confirmed = is_local_migration_confirmed
@@ -243,6 +258,8 @@ class PacketMonitor:
 
     def _do_arp_reply(self, pkt: Any, bridge: BridgeName, label: str) -> bool:
         """Send ARP reply for who-has in pkt; return True if sent."""
+        if str(bridge) in self.config.passive_bridges:
+            return False
         if ARP not in pkt or pkt[ARP].op != 1 or not getattr(pkt[ARP], "pdst", None) or Ether not in pkt:
             return False
         requested_ip = self._parse_ipv4(getattr(pkt[ARP], "pdst", None))
@@ -532,6 +549,23 @@ class PacketMonitor:
                 self._skipped_tap_mac.add(mac.lower())
                 self.log.info("skipping tap/veth interface mac=%s ip=%s", mac, ip)
             return False
+            
+        # skip if IP belongs to a declared subnet of a different bridge
+        if self._bridge_subnet_nets:
+            owner = self._bridge_subnet_cache.get(ip)
+            if owner is None and ip not in self._bridge_subnet_cache:
+                try:
+                    ip_obj = ipaddress.ip_address(ip)
+                    for net, br in self._bridge_subnet_nets:
+                        if ip_obj in net:
+                            owner = br
+                            break
+                except ValueError:
+                    pass
+                self._bridge_subnet_cache[ip] = owner
+            if owner is not None and owner != str(bridge):
+                return False
+
         # IP must be in snooped bridge subnet
         if not self._netlink.ip_in_bridge_subnets(ip):
             self.log.warning("reject ip=%s mac=%s bridge=%s (not in any snooped bridge subnet)", ip, mac, bridge)
@@ -823,6 +857,8 @@ class PacketMonitor:
     ) -> None:
         """Send ARP reply (slow path) or reinject unknown ARP."""
         if not self.config.arp_reply and not self.config.arp_reinject:
+            return
+        if str(bridge) in self.config.passive_bridges:
             return
         if ARP not in pkt or pkt[ARP].op != 1 or not hasattr(pkt[ARP], "pdst") or not pkt[ARP].pdst:
             return

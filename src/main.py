@@ -260,7 +260,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     # Core settings
     p.add_argument("--bridges", nargs="+", default=d.bridges,
-                   help=f"OVS bridges to monitor (default: {' '.join(d.bridges)})")
+                   help=f"OVS bridges to monitor, optionally with subnets BR:CIDR,... (default: {' '.join(d.bridges)})")
+    p.add_argument("--passive-bridges", nargs="*", default=d.passive_bridges,
+                   metavar="BR",
+                   help=f"Bridges to snoop only (no ARP reply/responder), optionally with subnets BR:CIDR,... (default: {' '.join(d.passive_bridges)})")
     p.add_argument("--service", action="store_true",
                    help="Run as long-lived daemon (required unless using --list-* / --test / --version)")
     p.add_argument("--db-path", default=d.db_path,
