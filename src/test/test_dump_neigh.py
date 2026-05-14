@@ -41,6 +41,7 @@ def test_dump_neigh_ttl_uses_last_seen_only() -> None:
         with redirect_stdout(buf):
             dump.dump_neigh(core)  # type: ignore[arg-type]
     out = buf.getvalue().strip()
-    # mesh_ttl=200, now=1000, last_seen=100 -> rem=0
-    assert out.endswith(" 0"), f"unexpected TTL output: {out}"
+    # mesh_ttl=200, now=1000, last_seen=100 -> rem=0; last column bridge
+    assert out.endswith("vmbr0"), f"unexpected line tail: {out}"
+    assert " 0 vmbr0" in out, f"unexpected TTL/bridge segment: {out}"
 

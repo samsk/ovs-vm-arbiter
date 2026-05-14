@@ -83,6 +83,7 @@ class Config:
     mesh_keepalive_interval: float = 59.0
     snoop_takeover_sec: Optional[float] = None  # local takeover age; None = mesh_ttl/10
     verify_local_migration: bool = True
+    allow_migration_from_passive_bridges: bool = False  # if True, passive snoop may run local migration / ownership flip like active bridges
     verify_remote_migration: bool = False
     mesh_silence_restart: bool = True  # warn + restart mesh if no recv for 10*keepalive; False=disable
     mesh_sign_key: Optional[str] = None
@@ -190,8 +191,24 @@ class Config:
     def is_debug(self) -> bool:
         return self.debug or self.log_level == "debug"
 
+    @property
+    def active_bridge(self) -> str:
+        """First monitored bridge: the single active OVS bridge (before passive append)."""
+        return str(self.bridges[0]) if self.bridges else "vmbr0"
+
     @classmethod
     def from_args(cls, args: argparse.Namespace) -> "Config":
+        b1 = getattr(args, "bridge_cli", None)
+        b2 = getattr(args, "bridges_cli", None)
+        if b1 is not None and b2 is not None:
+            raise ValueError("cannot combine --bridge and --bridges (use --bridge)")
+        if b1 is not None:
+            args.bridges = list(b1)
+        elif b2 is not None:
+            args.bridges = list(b2)
+        elif getattr(args, "bridges", None) is None:
+            args.bridges = list(cls().bridges)
+
         kwargs: dict[str, Any] = {}
         for f in dataclasses.fields(cls):
             if f.name.startswith("_"):
@@ -206,7 +223,7 @@ class Config:
             bridges = kwargs.get("bridges") or []
             if bridges:
                 kwargs["broadcast_iface"] = bridges[0]
-        
+
         # parse bridge specs for both bridges and passive_bridges
         bridge_subnets: dict[str, list[str]] = {}
         def _extract(tokens: list[str]) -> list[str]:
@@ -217,14 +234,19 @@ class Config:
                 if subnets_raw:
                     bridge_subnets[name] = [s.strip() for s in subnets_raw.split(",") if s.strip()]
             return names
-        
-        kwargs["bridges"] = _extract(kwargs.get("bridges") or [])
+
+        active_only = _extract(kwargs.get("bridges") or [])
+        if len(active_only) != 1:
+            raise ValueError(
+                "exactly one active OVS bridge required (use --bridge BR[:CIDR]); "
+                "additional snoop-only segments belong on --passive-bridges"
+            )
         kwargs["passive_bridges"] = _extract(kwargs.get("passive_bridges") or [])
         kwargs["bridge_subnets"] = bridge_subnets
 
-        # merge passive bridges into bridges (append; keep first for broadcast_iface)
+        # merge passive bridges into bridges (append; keep first = active for broadcast_iface)
         pb = kwargs.get("passive_bridges") or []
-        existing = list(kwargs.get("bridges") or [])
+        existing = list(active_only)
         for b in pb:
             if b not in existing:
                 existing.append(b)

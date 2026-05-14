@@ -359,7 +359,7 @@ def test_mesh_send_once_payload_contains_all_active_entries() -> None:
     entries.set(e1)
     entries.set(e2)
     entries.set(e3)
-    cfg = Config(bridges=["vmbr0", "vmbr1"], mesh_ttl=300.0)
+    cfg = Config(bridges=["vmbr0"], mesh_ttl=300.0)
     mesh = MeshBroadcaster(entries, logging.getLogger("test"), cfg, node_id=node)
     mesh._sock = MagicMock()
     with patch("src.mesh.time.time", return_value=now):
@@ -372,6 +372,29 @@ def test_mesh_send_once_payload_contains_all_active_entries() -> None:
     }
     payload_keys = {k for k in payload.keys() if not k.startswith("_")}
     _test_assert(payload_keys == expected_keys, "payload has full active snapshot keys")
+
+
+def test_mesh_recv_rewrites_passive_bridge_to_active() -> None:
+    """Mesh merge maps passive bridge keys to active store bridge."""
+    entries = IPEntryStore()
+    now = 500.0
+    cfg = Config(bridges=["vmbr0", "vmbr00"], passive_bridges=["vmbr00"], mesh_ttl=300.0)
+    mesh = MeshBroadcaster(entries, logging.getLogger("t_mesh_pas"), cfg, node_id="local")
+    ip = IPv4Address("192.168.12.5")
+    mac = MACAddress("aa:bb:cc:dd:ee:05")
+    raw = {
+        _key_to_str((ip, BridgeName("vmbr00"), None)): {
+            "ipv4": str(ip),
+            "mac": str(mac),
+            "bridge": "vmbr00",
+            "node": "10.0.0.2",
+            "last_seen": 400.0,
+        }
+    }
+    merged = mesh._merge_payload_entries("10.0.0.2", raw, now)
+    _test_assert(merged >= 1, "merged")
+    e = entries.get(ip, BridgeName("vmbr0"), None)
+    _test_assert(e is not None and str(e.bridge) == "vmbr0", "passive bridge name normalized")
 
 
 def test_mesh_recv_missing_remote_entry_seen_keys_multi_key() -> None:

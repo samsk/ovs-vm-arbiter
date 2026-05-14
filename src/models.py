@@ -4,7 +4,7 @@ from __future__ import annotations
 import dataclasses
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional, Tuple, get_args
+from typing import Any, Callable, FrozenSet, List, Optional, Tuple, get_args
 
 from src.types import (
     BridgeName,
@@ -386,6 +386,30 @@ class IPEntryStore:
         """Remove entry by key (no-op if missing)."""
         with self._lock:
             self._entries.pop(key, None)
+
+    def migrate_passive_bridge_keys(self, active: BridgeName, passive: FrozenSet[str]) -> int:
+        """Re-key entries on passive bridges to active; merge duplicate (ip, active, vlan)."""
+        if not passive:
+            return 0
+        moved = 0
+        with self._lock:
+            batch = [
+                (k, e)
+                for k, e in list(self._entries.items())
+                if k[1] is not None and str(k[1]) in passive
+            ]
+            for old_k, ent in batch:
+                if old_k not in self._entries:
+                    continue
+                del self._entries[old_k]
+                ent.bridge = active
+                new_k: IPEntryKey = (old_k[0], active, old_k[2])
+                if new_k in self._entries:
+                    self._entries[new_k].merge_from(ent)
+                else:
+                    self._entries[new_k] = ent
+                moved += 1
+        return moved
 
     def __contains__(self, key: IPEntryKey) -> bool:
         with self._lock:

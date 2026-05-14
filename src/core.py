@@ -643,6 +643,16 @@ class ArbiterCore:
                     self._entries.discard(key)
                 if dropped:
                     self.log.warning("dropped %d entries with no node (state invalid or legacy)", len(dropped))
+                n_mig = self._entries.migrate_passive_bridge_keys(
+                    BridgeName(cfg.active_bridge),
+                    frozenset(cfg.passive_bridges),
+                )
+                if n_mig:
+                    self.log.info(
+                        "migrated %d store keys from passive bridge names to active %s",
+                        n_mig,
+                        cfg.active_bridge,
+                    )
             except Exception as e:
                 self.log.error("state load failed, starting clean: %s", e)
                 # Clear any partial load so we start clean

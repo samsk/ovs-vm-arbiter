@@ -99,22 +99,23 @@ def dump_peers(app: ArbiterCore) -> None:
 
 
 def dump_neigh(app: ArbiterCore) -> None:
-    """Print neighbours from state: ip mac vlan node ttl."""
+    """Print neighbours from state: ip mac vlan node ttl bridge."""
     _dump_preamble(app, inject_local=True)
     ttl_sec = app.config.mesh_ttl
     now = time.time()
-    rows: list[tuple[str, str, str, str, str]] = []
+    rows: list[tuple[str, str, str, str, str, str]] = []
     for _key, entry in app._entries.items():
         vlan_str = str(entry.vlan) if entry.vlan is not None else "-"
         node = entry.node or "-"
+        br = str(entry.bridge) if entry.bridge is not None else "-"
         last = entry.last_seen
         if entry.expired is not None or not last:
             rem = 0
         else:
             rem = max(0, int(ttl_sec - (now - last)))
-        rows.append((str(entry.ipv4), str(entry.mac), vlan_str, node, str(rem)))
-    for ip, mac, vlan_str, node, rem in sorted(rows, key=lambda r: (r[0], r[1])):
-        print(f"{ip} {mac} {vlan_str} {node} {rem}")
+        rows.append((str(entry.ipv4), str(entry.mac), vlan_str, node, str(rem), br))
+    for ip, mac, vlan_str, node, rem, br in sorted(rows, key=lambda r: (r[0], r[1], r[5])):
+        print(f"{ip} {mac} {vlan_str} {node} {rem} {br}")
 
 
 def dump_refreshers(app: ArbiterCore) -> None:

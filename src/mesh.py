@@ -385,7 +385,14 @@ class MeshBroadcaster:
         merged = 0
         sender = NodeID(node)
         seen_keys: set[tuple[IPv4Address, Optional[BridgeName], Optional[int]]] = set()
+        passive_set = frozenset(self.config.passive_bridges)
+        active_bn = BridgeName(self.config.active_bridge)
         for entry_key, received in iter_ipentries_from_dict(raw):
+            ip_k, br_k, vlan_k = entry_key
+            if br_k is not None and str(br_k) in passive_set:
+                br_k = active_bn
+                entry_key = (ip_k, br_k, vlan_k)
+                received.bridge = br_k
             seen_keys.add(entry_key)
             if self._netlink and self._netlink.is_bridge_mac(received.mac):
                 continue

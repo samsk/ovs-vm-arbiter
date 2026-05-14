@@ -12,12 +12,12 @@ Usage (copy-paste)
 ------------------
   # Daemon (systemd uses --service)
   ovs-vm-arbiter.py --service
-  ovs-vm-arbiter.py --service --debug --bridges vmbr0 vmbr1
+  ovs-vm-arbiter.py --service --debug --bridge vmbr0
 
   # List modes
   ovs-vm-arbiter.py --list-db              # instance cache + snoop state (MAC-keyed)
   ovs-vm-arbiter.py --list-peers            # mesh peers (node -> count)
-  ovs-vm-arbiter.py --list-neigh            # neighbours: ip mac vlan node ttl (aliases: --list-n, --list-neighbours)
+  ovs-vm-arbiter.py --list-neigh            # neighbours: ip mac vlan node ttl bridge (aliases: --list-n, --list-neighbours)
   ovs-vm-arbiter.py --list-remote-ips      # VXLAN remote_ip -> port (no state; alias: --list-remote)
   ovs-vm-arbiter.py --list-local           # Local IPs on bridges connected via patch (ip mac vlan peer ofport port)
   ovs-vm-arbiter.py --list-responders      # OFS ARP responder: bridge ip mac vlan node learn_port prio
@@ -25,7 +25,7 @@ Usage (copy-paste)
 
 Options (essential)
 -------------------
-  --bridges BR [BR ...]     OVS bridges (default: vmbr0)
+  --bridge BR[:CIDR,...]   Single active OVS bridge (default: vmbr0); use --passive-bridges for more
   --db-path PATH            Proxmox config.db (default: /var/lib/pve-cluster/config.db)
   --state-dir DIR           State dir (default: /var/lib/ovs-vm-arbiter)
   --no-load-state           Skip loading old state on start
@@ -80,7 +80,7 @@ Options (OFS ARP responder)
   --arp-responder-sync-interval SEC      Reconcile responder flows with entries every SEC (default: 10).
   --arp-responder-local-iface [IFACE ...]
                                          Interfaces/bridges to scan for host-local IPs that get
-                                         ARP replies; empty = use --bridges (default: empty).
+                                         ARP replies; empty = use --bridge (default: empty).
   --arp-responder-reply-local / --no-arp-responder-reply-local
                                          Install responder flows for local IPs (snooped or
                                          local-iface); default: same as --arp-reply-local.
@@ -116,7 +116,7 @@ List-mode flags (exit after output)
   --list-local        List local IPs (connected bridges with IPs, patch ports)
   --list-refreshers   List ARP refresh peers: LOCAL, REMOTE, VLAN, PORT, TTL
   --list-responders   List OFS ARP responder entries (bridge ip mac vlan node learn_port prio) and exit
-  --list-fdb [BRIDGE] List FDB (port id, name, vlan, mac, age, node from db); bridge default=first --bridges
+  --list-fdb [BRIDGE] List FDB (port id, name, vlan, mac, age, node from db); bridge default=first --bridge
   --test              Run built-in tests and exit
 
 Logging
@@ -258,9 +258,25 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description="OVS VM Arbiter: instance discovery, ARP/DHCP snooping, mesh, flows"
     )
-    # Core settings
-    p.add_argument("--bridges", nargs="+", default=d.bridges,
-                   help=f"OVS bridges to monitor, optionally with subnets BR:CIDR,... (default: {' '.join(d.bridges)})")
+    # Core settings: exactly one active bridge (--bridge); --bridges is hidden compat alias
+    p.add_argument(
+        "--bridge",
+        nargs=1,
+        metavar="BR[:CIDR,...]",
+        default=None,
+        dest="bridge_cli",
+        help=(
+            "Single active OVS bridge to monitor, optional BR:CIDR,... "
+            f"(default: {d.bridges[0]!s}); more segments: --passive-bridges"
+        ),
+    )
+    p.add_argument(
+        "--bridges",
+        nargs="+",
+        default=None,
+        dest="bridges_cli",
+        help=argparse.SUPPRESS,
+    )
     p.add_argument("--passive-bridges", nargs="*", default=d.passive_bridges,
                    metavar="BR",
                    help=f"Bridges to snoop only (no ARP reply/responder), optionally with subnets BR:CIDR,... (default: {' '.join(d.passive_bridges)})")
@@ -328,6 +344,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"Allow local takeover only when PVE DB confirms local MAC move (default: {d.verify_local_migration})")
     p.add_argument("--verify-remote-migration", action=argparse.BooleanOptionalAction, default=d.verify_remote_migration,
                    help=f"Allow remote takeover only when sender claim and PVE DB cluster confirmation match (default: {d.verify_remote_migration})")
+    p.add_argument("--allow-migration-from-passive-bridges", action=argparse.BooleanOptionalAction, default=d.allow_migration_from_passive_bridges,
+                   help=f"Passive snoops use same migration rules as active when on (default: {d.allow_migration_from_passive_bridges})")
     p.add_argument("--arp-reply", action=argparse.BooleanOptionalAction, default=d.arp_reply,
                    help=f"Reply to ARP for known IPs (default: {d.arp_reply})")
     p.add_argument("--arp-reinject", action=argparse.BooleanOptionalAction, default=d.arp_reinject,
@@ -378,7 +396,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--arp-responder-sync-interval", type=float, default=d.arp_responder_sync_interval,
                    metavar="SEC", help=f"Reconcile ARP responder flows with entries every SEC (default: {d.arp_responder_sync_interval})")
     p.add_argument("--arp-responder-local-iface", nargs="*", default=d.arp_responder_local_iface, metavar="IFACE",
-                   help="Interfaces/bridges to scan for host-local IPs that get ARP replies; empty = use --bridges (default: empty)")
+                   help="Interfaces/bridges to scan for host-local IPs that get ARP replies; empty = use --bridge (default: empty)")
     p.add_argument("--arp-responder-reply-local", action=argparse.BooleanOptionalAction,
                    default=None, dest="arp_responder_reply_local",
                    help="Install responder for local IPs (snooped/local-iface); default: same as --arp-reply-local. Reply only when both true.")
@@ -486,7 +504,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--list-vlans", action="store_true",
                    help="List VLANs with scope (local/remote) and assigned IPs")
     p.add_argument("--list-fdb", nargs="?", const="", metavar="BRIDGE", dest="list_fdb", default=None,
-                   help="List FDB (port VLAN MAC age); optional bridge (default: first --bridges)")
+                   help="List FDB (port VLAN MAC age); optional bridge (default: first --bridge)")
     p.add_argument("--test", action="store_true", help="Run built-in tests and exit")
     p.add_argument("--version", action="store_true", help="Print zip timestamp as datetime and exit")
 
@@ -572,7 +590,10 @@ def main() -> int:
         args.debug_flags = current | 1
 
     # Build config from args
-    config = Config.from_args(args)
+    try:
+        config = Config.from_args(args)
+    except ValueError as e:
+        parser.error(str(e))
     _config = config
 
     # Nice name in ps (setproctitle) with args; prctl fallback for comm

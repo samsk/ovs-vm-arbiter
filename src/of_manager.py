@@ -49,6 +49,8 @@ def compute_desired_responders(
 ) -> Set[_ResponderKey]:
     """Compute desired ARP responder set from IP entry store.
 
+    Passive-bridge **entry.bridge** (legacy): still map flows to the single active bridge
+    (`bridges[0]`). Normalized snoop stores **IPEntry.bridge** as that active bridge.
     All snooped entries get responder keys (filtered only by reply_local). Then:
     - strict=False: one key per (br, ip, mac) with vlan=None (match any request vlan).
     - strict=True: per entry add (br, ip, mac, match_vlan); if arp_reply_no_vlan and not for_responder
@@ -61,10 +63,9 @@ def compute_desired_responders(
     no_vlan_ok = arp_reply_no_vlan and not for_responder  # responder ignores no_vlan
     desired: Set[_ResponderKey] = set()
     per_br_ip: Dict[Tuple[BridgeName, IPv4Address], MACAddress] = {}
+    active_bridge_list = [BridgeName(str(bridges[0]))] if bridges else []
     for _key, entry in active.items():
         if not entry.bridge:
-            continue
-        if str(entry.bridge) in passive_bridges:
             continue
         is_local = (
             node_id is None
@@ -75,7 +76,11 @@ def compute_desired_responders(
         ip = entry.ipv4
         entry_br = entry.bridge
         mac = entry.mac
-        if entry_br in bridges:
+        if str(entry_br) in passive_bridges:
+            if not active_bridge_list:
+                continue
+            target_bridges = active_bridge_list
+        elif entry_br in bridges:
             target_bridges = [entry_br]
         else:
             target_bridges = list(bridges)

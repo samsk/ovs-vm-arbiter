@@ -87,6 +87,12 @@ class PacketMonitor:
         )
         # cache: ip_str -> owner_bridge_name | None
         self._bridge_subnet_cache: dict[str, Optional[str]] = {}
+        # per-bridge declared nets (union = allowlist for snoop on that bridge)
+        _by_bridge: dict[str, list[Any]] = {}
+        for net, br_name in _raw:
+            _by_bridge.setdefault(br_name, []).append(net)
+        self._bridge_allowlist_nets: dict[str, list[Any]] = _by_bridge
+        self._bridge_allowlist_cache: dict[tuple[str, str], bool] = {}
 
         self._last_snoop_time: float = 0.0  # for snoop-silence watchdog
         self._get_local_vlans = get_local_vlans
@@ -101,6 +107,20 @@ class PacketMonitor:
         self._arp_mac_mismatch_count: int = 0
         self._migration_local_refused_count: int = 0
         self._migration_local_confirmed_count: int = 0
+
+    def _passive_bridge(self, bridge: BridgeName) -> bool:
+        """True if bridge is passive (snoop-only, no ARP responder/reply)."""
+        return str(bridge) in self.config.passive_bridges
+
+    def _passive_migration_disallowed(self, bridge: BridgeName) -> bool:
+        """True when passive bridge and allow_migration_from_passive_bridges is off."""
+        return self._passive_bridge(bridge) and not self.config.allow_migration_from_passive_bridges
+
+    def _store_bridge(self, sniff_bridge: BridgeName) -> BridgeName:
+        """Persisted IPEntry.bridge: active bridge when sniffing a passive iface."""
+        if str(sniff_bridge) in self.config.passive_bridges:
+            return BridgeName(self.config.active_bridge)
+        return sniff_bridge
 
     def _emit_owner_change(
         self,
@@ -258,7 +278,7 @@ class PacketMonitor:
 
     def _do_arp_reply(self, pkt: Any, bridge: BridgeName, label: str) -> bool:
         """Send ARP reply for who-has in pkt; return True if sent."""
-        if str(bridge) in self.config.passive_bridges:
+        if self._passive_bridge(bridge):
             return False
         if ARP not in pkt or pkt[ARP].op != 1 or not getattr(pkt[ARP], "pdst", None) or Ether not in pkt:
             return False
@@ -566,9 +586,25 @@ class PacketMonitor:
             if owner is not None and owner != str(bridge):
                 return False
 
+        br_s = str(bridge)
+        allow_nets = self._bridge_allowlist_nets.get(br_s) or []
+        if allow_nets:
+            ckey = (str(ip), br_s)
+            in_allow = self._bridge_allowlist_cache.get(ckey)
+            if in_allow is None:
+                try:
+                    ip_obj = ipaddress.ip_address(ip)
+                except ValueError:
+                    in_allow = False
+                else:
+                    in_allow = any(ip_obj in net for net in allow_nets)
+                self._bridge_allowlist_cache[ckey] = in_allow
+            if not in_allow:
+                return False
+
         # IP must be in snooped bridge subnet
         if not self._netlink.ip_in_bridge_subnets(ip):
-            self.log.warning("reject ip=%s mac=%s bridge=%s (not in any snooped bridge subnet)", ip, mac, bridge)
+            self.log.debug("reject ip=%s mac=%s bridge=%s (not in any snooped bridge subnet)", ip, mac, bridge)
             return False
         # Skip excluded subnets
         try:
@@ -674,10 +710,11 @@ class PacketMonitor:
             return
         if vlan_for_filter in self.config.no_snoop_vlan_set:
             return
+        store_br = self._store_bridge(bridge)
         # One snooped VLAN per (ip, bridge); don't overwrite remote when seen on local vlan
         ttl = self.config.mesh_ttl
         node = NodeID(self.node_id) if self.node_id else None
-        for _key, e in self.entries.get_entries_for_bridge_ip(ip, bridge):
+        for _key, e in self.entries.get_entries_for_bridge_ip(ip, store_br):
             if not e.is_active(now, ttl):
                 continue
             key_vlan = _key[2]
@@ -690,6 +727,17 @@ class PacketMonitor:
                         and self.config.verify_local_migration
                         and self._is_local_migration_confirmed is not None
                     ):
+                        if self._passive_migration_disallowed(bridge):
+                            self.log.debug(
+                                "snoop ip=%s mac=%s bridge=%s vlan=%s passive keep remote=%s",
+                                ip,
+                                mac,
+                                bridge,
+                                vlan_n,
+                                e.node,
+                            )
+                            self._last_snoop_time = now
+                            return
                         if self._is_local_migration_confirmed(mac):
                             self._migration_local_confirmed_count += 1
                             try:
@@ -719,9 +767,9 @@ class PacketMonitor:
                     )
                     return  # remote VM on our vlan, don't overwrite
                 return  # we already have this IP on another vlan
-        cur = self.entries.get(ip, bridge, vlan_n)
+        cur = self.entries.get(ip, store_br, vlan_n)
         changed = cur is None or cur.mac != mac
-        rate_key = f"{ip}|{bridge}|{vlan_n}"
+        rate_key = f"{ip}|{store_br}|{vlan_n}"
         last_ts = self._last_update_per_ip.get(rate_key, 0)
         if not changed and (now - last_ts) < self._flood_min_interval:
             return
@@ -744,11 +792,11 @@ class PacketMonitor:
                     bridge,
                     vlan_n,
                 )
-                self._emit_owner_change(ip, bridge, vlan_n, cur.node, node)
+                self._emit_owner_change(ip, store_br, vlan_n, cur.node, node)
             entry = IPEntry(
                 ipv4=ip,
                 mac=mac,
-                bridge=bridge,
+                bridge=store_br,
                 type=entry_type,
                 last_seen=now,
                 snoop_origin=origins,
@@ -757,6 +805,23 @@ class PacketMonitor:
                 vlan=vlan_n,
             )
             self.entries.set(entry)
+            if self._passive_bridge(bridge):
+                for other_key, other_entry in self.entries.get_entries_by_mac(mac):
+                    other_br = other_key[1]
+                    if other_br is None:
+                        continue
+                    if str(other_br) in self.config.passive_bridges:
+                        continue
+                    if other_key[0] != ip:
+                        continue
+                    if other_br == store_br and other_key[2] == vlan_n:
+                        continue
+                    if other_entry.expired is not None:
+                        continue
+                    try:
+                        self.entries.update(other_key, expired=now)
+                    except KeyError:
+                        pass
             self._last_snoop_time = now
             self.log.debug(
                 "db ip %s local ipv4=%s mac=%s bridge=%s vlan=%s type=%s",
@@ -789,6 +854,15 @@ class PacketMonitor:
                     self.log.debug(
                         "recv ip=%s kept remote bridge node=%s mac=%s",
                         ip, cur.node, mac,
+                    )
+                    self._last_snoop_time = now
+                    return
+                elif self._passive_migration_disallowed(bridge):
+                    self.log.debug(
+                        "recv ip=%s passive bridge keep remote node=%s mac=%s",
+                        ip,
+                        cur.node,
+                        mac,
                     )
                     self._last_snoop_time = now
                     return
@@ -828,7 +902,7 @@ class PacketMonitor:
                     vlan_n,
                 )
                 update_kw["node"] = node
-                self._emit_owner_change(ip, bridge, vlan_n, cur.node, node)
+                self._emit_owner_change(ip, store_br, vlan_n, cur.node, node)
             self._last_snoop_time = now
             try:
                 self.entries.update(_entry_key(cur), **update_kw)
@@ -837,7 +911,7 @@ class PacketMonitor:
                 entry = IPEntry(
                     ipv4=ip,
                     mac=mac,
-                    bridge=bridge,
+                    bridge=store_br,
                     type=entry_type,
                     last_seen=now,
                     snoop_origin=origins,
@@ -858,7 +932,7 @@ class PacketMonitor:
         """Send ARP reply (slow path) or reinject unknown ARP."""
         if not self.config.arp_reply and not self.config.arp_reinject:
             return
-        if str(bridge) in self.config.passive_bridges:
+        if self._passive_bridge(bridge):
             return
         if ARP not in pkt or pkt[ARP].op != 1 or not hasattr(pkt[ARP], "pdst") or not pkt[ARP].pdst:
             return
@@ -948,7 +1022,7 @@ class PacketMonitor:
         if vlan_id is None and instance:
             vlan_id = instance.vlan
         if vlan_id is None:
-            vlan_id = self.entries.get_known_vlan(ip, bridge)
+            vlan_id = self.entries.get_known_vlan(ip, self._store_bridge(bridge))
         # Update store
         self._update_snoop_entry(mac, ip, bridge, entry_type, ptype, vlan_id, instance)
         # ARP reply slow path / reinject

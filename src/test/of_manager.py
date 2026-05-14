@@ -444,7 +444,7 @@ def test_compute_desired_responders_remote_localize_uses_entry_vlan() -> None:
 
 
 def test_compute_desired_responders_passive_bridges() -> None:
-    """Entries on passive bridges excluded from desired responder set."""
+    """Passive bridge entries promote responder keys onto active bridges only."""
     from src.of_manager import compute_desired_responders
 
     entries = IPEntryStore()
@@ -466,8 +466,12 @@ def test_compute_desired_responders_passive_bridges() -> None:
     )
     _test_assert((br_active, ip_active, mac_active, None) in desired, "active bridge entry included")
     _test_assert(
-        not any(ip == ip_passive for (_, ip, _, _) in desired),
-        "passive bridge entry excluded",
+        (br_active, ip_passive, mac_passive, None) in desired,
+        "passive-learned IP gets responder on active bridge",
+    )
+    _test_assert(
+        not any(str(br) == "vmbr00" for (br, _, _, _) in desired),
+        "no responder keys on passive bridge",
     )
 
 

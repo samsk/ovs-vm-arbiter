@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional, Callable
+from typing import Any, Callable, Iterator, Optional
 from unittest.mock import MagicMock, patch
 from src.types import MACAddress, IPv4Address, BridgeName, InterfaceName, NodeID, OFPort, VMID
 from src.models import InstanceInfo, InstanceStore, IPEntryStore, IPEntry
@@ -986,7 +986,7 @@ def _make_snoop_monitor(
     log = logging.getLogger("test")
     inst = instances or InstanceStore()
     cfg = Config(
-        bridges=[bridge, "vmbr1", "vmbr00"],
+        bridges=[bridge, "vmbr00"],
         snoop_bridge=snoop_bridge,
         snoop_host_local=snoop_host_local,
         exclude_subnets=exclude_subnets or [],
@@ -1004,7 +1004,7 @@ def _make_snoop_monitor(
     netlink_mock.is_host_local.return_value = is_host_local
     with patch("src.packet_monitor.NetlinkInfo", MagicMock(return_value=netlink_mock)):
         return PacketMonitor(
-            inst, entries, log, ovs_mock, of_mock, cfg, node_id=NodeID("n1")
+            inst, entries, log, ovs_mock, of_mock, cfg, node_id=NodeID("n1"),
         )
 
 
@@ -1223,20 +1223,26 @@ def test_snoop_bridge_subnet_empty_no_cross_bridge_filter() -> None:
     _test_assert(entries.get(IPv4Address("192.168.12.10"), br, None) is not None, "no filter without declarations")
 
 
-def test_snoop_bridge_subnet_ip_outside_declared_nets_not_skipped() -> None:
-    """IP not in any declared CIDR: cache None; snoop on any bridge proceeds."""
+def test_snoop_bridge_subnet_ip_outside_declared_nets_vmbr0_ok_vmbr00_rejected() -> None:
+    """IP outside vmbr00 CIDR: vmbr0 still snoops; vmbr00 allowlist rejects."""
     if Ether is None or ARP is None:
         raise AssertionError("scapy required")
     entries = IPEntryStore()
     mon = _make_snoop_monitor(entries, bridge_subnets={"vmbr00": ["192.168.12.0/27"]})
     br0 = BridgeName("vmbr0")
     ip_out = "10.0.0.50"
-    pkt = Ether(src="aa:bb:cc:dd:ee:ff", dst="ff:ff:ff:ff:ff:ff") / ARP(
-        op=1, hwsrc="aa:bb:cc:dd:ee:ff", psrc=ip_out, pdst="10.0.0.1"
+    pkt0 = Ether(src="aa:bb:cc:dd:ee:aa", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, hwsrc="aa:bb:cc:dd:ee:aa", psrc=ip_out, pdst="10.0.0.1"
     )
-    mon._handle_packet(pkt, br0)
-    _test_assert(mon._bridge_subnet_cache.get(ip_out) is None, "outside nets -> cached None")
-    _test_assert(entries.get(IPv4Address(ip_out), br0, None) is not None, "snoop on vmbr0 allowed")
+    mon._handle_packet(pkt0, br0)
+    _test_assert(mon._bridge_subnet_cache.get(ip_out) is None, "outside nets -> cached None owner")
+    _test_assert(entries.get(IPv4Address(ip_out), br0, None) is not None, "vmbr0 no allowlist -> snoop ok")
+    br00 = BridgeName("vmbr00")
+    pkt32 = Ether(src="aa:bb:cc:dd:ee:bb", dst="ff:ff:ff:ff:ff:ff") / ARP(
+        op=1, hwsrc="aa:bb:cc:dd:ee:bb", psrc="192.168.12.32", pdst="192.168.12.1"
+    )
+    mon._handle_packet(pkt32, br00)
+    _test_assert(entries.get(IPv4Address("192.168.12.32"), br00, None) is None, "vmbr00 allowlist rejects .32")
 
 
 def test_snoop_bridge_subnet_invalid_cidr_ignored() -> None:
@@ -1266,6 +1272,80 @@ def test_is_valid_snoop_bridge_subnet_same_owner_returns_true() -> None:
     br = BridgeName("vmbr00")
     ok = mon._is_valid_snoop(mac, ip, br)
     _test_assert(ok is True, "owner bridge accepts snoop for declared IP")
+
+
+def test_bridge_allowlist_cache_reuses_membership() -> None:
+    """Repeated (ip, bridge) uses allowlist cache, no duplicate work."""
+    entries = IPEntryStore()
+    mon = _make_snoop_monitor(entries, bridge_subnets={"vmbr00": ["192.168.12.0/27"]})
+    mac = MACAddress("aa:bb:cc:dd:ee:02")
+    ip = IPv4Address("192.168.12.10")
+    br = BridgeName("vmbr00")
+    mon._is_valid_snoop(mac, ip, br)
+    mon._is_valid_snoop(mac, ip, br)
+    _test_assert(mon._bridge_allowlist_cache.get((str(ip), "vmbr00")) is True, "cached allow")
+
+
+def test_owner_subnet_cache_skips_second_net_walk() -> None:
+    """Second _is_valid_snoop same IP does not re-iterate declared bridge nets."""
+    entries = IPEntryStore()
+    mon = _make_snoop_monitor(entries, bridge_subnets={"vmbr00": ["192.168.12.0/27"]})
+
+    class CountList(list):
+        def __init__(self, inner: list) -> None:
+            super().__init__(inner)
+            self.iter_count = 0
+
+        def __iter__(self) -> Iterator[Any]:
+            self.iter_count += 1
+            return super().__iter__()
+
+    cl = CountList(list(mon._bridge_subnet_nets))
+    mon._bridge_subnet_nets = cl  # type: ignore[assignment]
+    mac = MACAddress("aa:bb:cc:dd:ee:03")
+    ip = IPv4Address("192.168.12.10")
+    br = BridgeName("vmbr00")
+    mon._is_valid_snoop(mac, ip, br)
+    first = cl.iter_count
+    mon._is_valid_snoop(mac, ip, br)
+    _test_assert(cl.iter_count == first, "owner cache avoids second net walk")
+
+
+def test_passive_snoop_stores_under_active_bridge() -> None:
+    """Passive snoop persists IPEntry.bridge as active (single active bridge)."""
+    entries = IPEntryStore()
+    ip = IPv4Address("192.168.12.10")
+    mac = MACAddress("bc:24:11:aa:aa:01")
+    br_act = BridgeName("vmbr0")
+    br_pas = BridgeName("vmbr00")
+    inst = InstanceStore()
+    inst.set(
+        mac,
+        InstanceInfo(vmid=VMID("101"), type="qemu", bridge=br_pas, mac=mac, ip=None),
+    )
+    entries.set(
+        IPEntry(
+            ipv4=ip,
+            mac=MACAddress("aa:bb:cc:dd:ee:99"),
+            bridge=br_act,
+            last_seen=100.0,
+            node=NodeID("n1"),
+            type="foreign",
+        )
+    )
+    mon = _make_snoop_monitor_with_node(
+        entries,
+        instances=inst,
+        bridges=["vmbr0", "vmbr00"],
+        passive_bridges=["vmbr00"],
+        bridge_subnets={"vmbr00": ["192.168.12.0/27"]},
+        verify_local_migration=False,
+    )
+    with patch("src.packet_monitor.time.time", return_value=5000.0):
+        mon._update_snoop_entry(mac, ip, br_pas, "qemu", "arp", None, inst.get(mac))
+    act = entries.get(ip, br_act, None)
+    _test_assert(act is not None and act.mac == mac and act.expired is None, "one row on active bridge")
+    _test_assert(entries.get(ip, br_pas, None) is None, "no passive-named store key")
 
 
 def test_snoop_host_local_skipped() -> None:
@@ -1375,16 +1455,24 @@ def _make_snoop_monitor_with_node(
     on_owner_change: Optional[
         Callable[[IPv4Address, BridgeName, Optional[int], Optional[NodeID], Optional[NodeID]], None]
     ] = None,
+    bridges: Optional[list[str]] = None,
+    passive_bridges: Optional[list[str]] = None,
+    allow_migration_from_passive_bridges: bool = False,
+    bridge_subnets: Optional[dict[str, list[str]]] = None,
 ) -> PacketMonitor:
     """Monitor with netlink mocked; node_id set for _update_snoop_entry node tests."""
     log = logging.getLogger("test")
     inst = instances or InstanceStore()
+    br_list = bridges if bridges is not None else ["vmbr0"]
     cfg = Config(
-        bridges=["vmbr0"],
+        bridges=br_list,
         mesh_ttl=990.0,
         flood_min_interval=5.0,
         snoop_takeover_sec=snoop_takeover_sec if snoop_takeover_sec is not None else 99.0,
         verify_local_migration=verify_local_migration,
+        passive_bridges=passive_bridges or [],
+        allow_migration_from_passive_bridges=allow_migration_from_passive_bridges,
+        bridge_subnets=bridge_subnets or {},
     )
     ovs_mock = MagicMock()
     ovs_mock.get_bridge_vlan_to_local_port.return_value = {}
@@ -1942,6 +2030,163 @@ def test_snoop_takeover_denied_when_local_confirm_fails_qemu_logs_error() -> Non
     _test_assert(entry is not None and entry.node == NodeID("172.16.12.13"), "owner unchanged when not confirmed")
     _test_assert(confirm.call_count == 1, "confirm callback called")
     _test_assert(mon.log.error.call_count >= 1, "qemu denied migration logs error")
+
+
+def test_snoop_passive_bridge_remote_refresh_skips_migration_confirm() -> None:
+    """Passive bridge: remote-owned refresh skips DB migrate confirm and alerts."""
+    entries = IPEntryStore()
+    instances = InstanceStore()
+    mac = MACAddress("bc:24:11:aa:aa:01")
+    instances.set(
+        mac,
+        InstanceInfo(
+            vmid=VMID("777"),
+            type="qemu",
+            bridge=BridgeName("vmbr00"),
+            mac=mac,
+            vlan=None,
+        ),
+    )
+    confirm = MagicMock(return_value=False)
+    mon = _make_snoop_monitor_with_node(
+        entries,
+        node_id="172.16.12.10",
+        instances=instances,
+        snoop_takeover_sec=300.0,
+        verify_local_migration=True,
+        is_local_migration_confirmed=confirm,
+        bridges=["vmbr0", "vmbr00"],
+        passive_bridges=["vmbr00"],
+    )
+    mon.log = MagicMock(spec=logging.Logger)
+    br = BridgeName("vmbr00")
+    ip = IPv4Address("192.168.12.14")
+    now = 1000.0
+    entries.set(
+        IPEntry(
+            ipv4=ip,
+            mac=mac,
+            bridge=BridgeName("vmbr0"),
+            node=NodeID("172.16.12.11"),
+            last_seen=999.0,
+            snoop_origin=["arp"],
+        )
+    )
+    inst = instances.get(mac)
+    _test_assert(inst is not None, "instance exists")
+    with patch("src.packet_monitor.time") as m_time:
+        m_time.time.return_value = now
+        mon._update_snoop_entry(mac, ip, br, "qemu", "arp", None, inst)
+    entry = entries.get(ip, BridgeName("vmbr0"), None)
+    _test_assert(entry is not None and entry.node == NodeID("172.16.12.11"), "owner unchanged")
+    _test_assert(confirm.call_count == 0, "passive skips confirm")
+    _test_assert(mon.log.error.call_count == 0, "no migration denied alert")
+
+
+def test_snoop_passive_bridge_cross_vlan_remote_skips_migration_denied() -> None:
+    """Passive bridge: cross-vlan vs remote skips denied migrate path."""
+    entries = IPEntryStore()
+    instances = InstanceStore()
+    mac = MACAddress("bc:24:11:2e:5b:e5")
+    instances.set(
+        mac,
+        InstanceInfo(
+            vmid=VMID("901"),
+            type="qemu",
+            bridge=BridgeName("vmbr00"),
+            mac=mac,
+            vlan=99,
+        ),
+    )
+    confirm = MagicMock(return_value=False)
+    mon = _make_snoop_monitor_with_node(
+        entries,
+        node_id="172.16.12.11",
+        instances=instances,
+        verify_local_migration=True,
+        is_local_migration_confirmed=confirm,
+        bridges=["vmbr0", "vmbr00"],
+        passive_bridges=["vmbr00"],
+    )
+    mon.log = MagicMock(spec=logging.Logger)
+    br = BridgeName("vmbr00")
+    ip = IPv4Address("192.168.13.183")
+    remote = NodeID("172.16.12.10")
+    now = 1000.0
+    entries.set(
+        IPEntry(
+            ipv4=ip,
+            mac=mac,
+            bridge=BridgeName("vmbr0"),
+            vlan=None,
+            node=remote,
+            last_seen=995.0,
+            snoop_origin=["arp"],
+        )
+    )
+    inst = instances.get(mac)
+    _test_assert(inst is not None, "instance exists")
+    with patch("src.packet_monitor.time") as m_time:
+        m_time.time.return_value = now
+        mon._update_snoop_entry(mac, ip, br, "qemu", "arp", 99, inst)
+    kept = entries.get(ip, BridgeName("vmbr0"), None)
+    claimed = entries.get(ip, BridgeName("vmbr0"), 99)
+    _test_assert(confirm.call_count == 0, "passive skips confirm")
+    _test_assert(kept is not None and kept.node == remote, "remote kept")
+    _test_assert(claimed is None, "no local claimed entry")
+    _test_assert(mon.log.error.call_count == 0, "no migration denied alert")
+
+
+def test_snoop_passive_bridge_allow_migration_restores_db_confirm() -> None:
+    """allow_migration_from_passive_bridges: passive runs migration confirm vs mesh-remote owner."""
+    entries = IPEntryStore()
+    instances = InstanceStore()
+    mac = MACAddress("bc:24:11:aa:aa:02")
+    instances.set(
+        mac,
+        InstanceInfo(
+            vmid=VMID("778"),
+            type="qemu",
+            bridge=BridgeName("vmbr00"),
+            mac=mac,
+            vlan=None,
+        ),
+    )
+    confirm = MagicMock(return_value=False)
+    mon = _make_snoop_monitor_with_node(
+        entries,
+        node_id="172.16.12.10",
+        instances=instances,
+        snoop_takeover_sec=300.0,
+        verify_local_migration=True,
+        is_local_migration_confirmed=confirm,
+        bridges=["vmbr0", "vmbr00"],
+        passive_bridges=["vmbr00"],
+        allow_migration_from_passive_bridges=True,
+    )
+    mon.log = MagicMock(spec=logging.Logger)
+    br = BridgeName("vmbr00")
+    ip = IPv4Address("192.168.12.15")
+    now = 1000.0
+    entries.set(
+        IPEntry(
+            ipv4=ip,
+            mac=mac,
+            bridge=BridgeName("vmbr0"),
+            node=NodeID("172.16.12.11"),
+            last_seen=999.0,
+            snoop_origin=["arp"],
+        )
+    )
+    inst = instances.get(mac)
+    _test_assert(inst is not None, "instance exists")
+    with patch("src.packet_monitor.time") as m_time:
+        m_time.time.return_value = now
+        mon._update_snoop_entry(mac, ip, br, "qemu", "arp", None, inst)
+    entry = entries.get(ip, BridgeName("vmbr0"), None)
+    _test_assert(entry is not None and entry.node == NodeID("172.16.12.11"), "owner unchanged")
+    _test_assert(confirm.call_count == 1, "confirm runs when passive verify enabled")
+    _test_assert(mon.log.error.call_count >= 1, "migration denied logged")
 
 
 def test_snoop_takeover_allowed_when_local_confirm_passes() -> None:

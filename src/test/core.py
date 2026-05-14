@@ -258,14 +258,15 @@ def test_check_proxy_arp_on_monitored_bridges() -> None:
         cfg = Config(
             state_dir=tmp,
             db_path=os.path.join(tmp, "x.db"),
-            bridges=["vmbr0", "vmbr1"],
+            bridges=["vmbr0", "vmbr00"],
+            passive_bridges=["vmbr00"],
         )
         core = ArbiterCore(cfg, log)
 
         def _fake_open(path: str, mode: str = "r", encoding: str = "utf-8"):  # type: ignore[override]
             if path.endswith("/vmbr0/proxy_arp"):
                 return io.StringIO("1\n")
-            if path.endswith("/vmbr1/proxy_arp"):
+            if path.endswith("/vmbr00/proxy_arp"):
                 return io.StringIO("0\n")
             raise OSError("missing")
 

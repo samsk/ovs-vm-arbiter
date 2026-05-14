@@ -501,3 +501,15 @@ def test_instance_store_update_all_and_contains() -> None:
         mac not in store and store.get(MACAddress("00:00:00:00:00:01")).vmid == "2",
         "update_all",
     )
+
+
+def test_ip_entry_store_migrate_passive_bridge_keys() -> None:
+    """migrate_passive_bridge_keys moves passive keys to active bridge."""
+    store = IPEntryStore()
+    ip = IPv4Address("10.0.0.1")
+    mac = MACAddress("aa:bb:cc:dd:ee:01")
+    store.set(IPEntry(ipv4=ip, mac=mac, bridge=BridgeName("vmbr00"), last_seen=1.0, node=NodeID("n1")))
+    n = store.migrate_passive_bridge_keys(BridgeName("vmbr0"), frozenset({"vmbr00"}))
+    _test_assert(n == 1, "one row moved")
+    _test_assert(store.get(ip, BridgeName("vmbr0"), None) is not None, "now under vmbr0")
+    _test_assert(store.get(ip, BridgeName("vmbr00"), None) is None, "old key gone")
